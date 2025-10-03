@@ -3,8 +3,10 @@
 This repo allows you to run a pipeline to track the trigeminal nerves.
 There are two scripts that need to be run one after the other.
 
-trigeminal_first_order.sh
-trigeminal_second_order.sh
+You will need scilpy 2.2.0 and ANTs to be installed in order to run these scripts.
+
+- trigeminal_first_order.sh
+- trigeminal_second_order.sh
 
 ## Input structure
 
