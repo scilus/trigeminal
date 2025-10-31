@@ -53,7 +53,7 @@ else
 fi
 
 fa_threshold=0.10
-npv_first_order=20000
+npv_first_order=2222  #20000
 opposite_side=leftright
 
 gpu=""
