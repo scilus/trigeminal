@@ -73,9 +73,9 @@ do
         -f ${subject_dir}/${nsub}/tractoflow/${nsub}__t1_warped.nii.gz \
         -m ${mni_dir}/MNI/mni_masked.nii.gz \
         -t s \
-        -o ${out_dir}/${nsub}/orig_space/transfo/mni2orig_ \
+        -o ${out_dir}/${nsub}/orig_space/transfo/2orig_ \
         -y 1 \
-        -n ${nb_thread}
+        -n ${nb_thread} >> ${out_dir}/${nsub}/orig_space/transfo/2orig_log.txt
 
     echo "|------------- 1.1) Reshape aparc.DKTatlas+aseg.mgz orig space -------------|"
     ## [ORIG-SPACE] Reshape aparc.DKTatlas+aseg.mgz
@@ -129,8 +129,8 @@ do
         antsApplyTransforms -d 3 \
             -i ${orig_rois_dir}/${nsub}_${roi}_orig.nii.gz \
             -r ${mni_dir}/MNI/mni_masked.nii.gz \
-            -t [${out_dir}/${nsub}/orig_space/transfo/mni2orig_0GenericAffine.mat, 1] \
-            -t ${out_dir}/${nsub}/orig_space/transfo/mni2orig_1InverseWarp.nii.gz \
+            -t [${out_dir}/${nsub}/orig_space/transfo/2orig_0GenericAffine.mat, 1] \
+            -t ${out_dir}/${nsub}/orig_space/transfo/2orig_1InverseWarp.nii.gz \
             -o ${mni_rois_dir}/${nsub}_${roi}_mni.nii.gz \
             -n NearestNeighbor;
 
@@ -153,8 +153,8 @@ do
             antsApplyTransforms -d 3 \
                 -i ${component} \
                 -r ${subject_dir}/${nsub}/tractoflow/${nsub}__t1_warped.nii.gz \
-                -t ${out_dir}/${nsub}/orig_space/transfo/mni2orig_1Warp.nii.gz \
-                -t ${out_dir}/${nsub}/orig_space/transfo/mni2orig_0GenericAffine.mat \
+                -t ${out_dir}/${nsub}/orig_space/transfo/2orig_1Warp.nii.gz \
+                -t ${out_dir}/${nsub}/orig_space/transfo/2orig_0GenericAffine.mat \
                 -o ${out_dir}/${nsub}/orig_space/${mask_type}/${nsub}__${atlas_component} \
                 -n NearestNeighbor;
 
@@ -186,9 +186,9 @@ do
             scil_tractogram_apply_transform \
                 ${out_dir}/${nsub}/orig_space/tractograms/orig/${nsub}__${atlas_component/.nii.gz/_npv_${npv}.trk} \
                 ${mni_dir}/MNI/mni_masked.nii.gz \
-                ${out_dir}/${nsub}/orig_space/transfo/mni2orig_0GenericAffine.mat \
+                ${out_dir}/${nsub}/orig_space/transfo/2orig_0GenericAffine.mat \
                 ${mni_tracking_dir}/orig/${nsub}__${atlas_component/.nii.gz/_npv_${npv}.trk} \
-                --in_deformation ${out_dir}/${nsub}/orig_space/transfo/mni2orig_1Warp.nii.gz \
+                --in_deformation ${out_dir}/${nsub}/orig_space/transfo/2orig_1Warp.nii.gz \
                 --remove_invalid \
                 --reverse_operation -f
         done
