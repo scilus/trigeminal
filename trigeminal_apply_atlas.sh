@@ -1,11 +1,28 @@
-usage() { echo "$(basename $0) [-s path/to/subjects] [-m path/to/mni] [-a atlas_dir] [-o output_dir] [-g] (if you have a gpu)" 1>&2; exit 1; }
+#!/bin/bash
 
-while getopts "s:m:a:o:g:" args; do
+# Input structure
+#
+#    [input]
+#    ├── sub-01
+#    │   ├── freesurfer
+#    │   │   └─── aparc.DKTatlas+aseg.mgz
+#    │   ├── sub-01__fa.nii.gz
+#    │   ├── sub-01__fodf.nii.gz
+#    │   └── sub-01__t1_warped.nii.gz
+#    │
+#    ├── S2
+#    .
+#    .
+
+usage() { echo "$(basename $0) [-s path/to/subjects] [-m path/to/mni] [-a atlas_dir] [-o output_dir] [-t nb_threads] [-g] (if you have a gpu)" 1>&2; exit 1; }
+
+while getopts "s:m:a:o:t:g:" args; do
     case "${args}" in
         s) s=${OPTARG};;
         m) m=${OPTARG};;
         a) a=${OPTARG};;
         o) o=${OPTARG};;
+        t) t=${OPTARG};;
         g) g=${OPTARG};;
         *) usage;;
     esac
@@ -25,6 +42,7 @@ subject_dir=${s}
 atlas_dir=${a}
 mni_dir=${m}
 out_dir=${o}
+nb_thread=${t}
 
 echo "Folder subjects: " ${subject_dir}
 echo "Folder MNI: " ${mni_dir}
@@ -35,7 +53,6 @@ echo "GPU: " ${gpu}
 npv_list="100 400"
 opposite_side=leftright
 fa_threshold=0.01
-mni_roi_dir
 
 for nsub in ${subject_dir}/*/
 do
@@ -58,7 +75,7 @@ do
         -t s \
         -o ${out_dir}/${nsub}/orig_space/transfo/mni2orig_ \
         -y 1 \
-        -n 10
+        -n ${nb_thread}
 
     echo "|------------- 1.1) Reshape aparc.DKTatlas+aseg.mgz orig space -------------|"
     ## [ORIG-SPACE] Reshape aparc.DKTatlas+aseg.mgz
@@ -118,8 +135,8 @@ do
             -n NearestNeighbor;
 
         scil_volume_math convert \
-        ${mni_rois_dir}/${nsub}_${roi}_mni.nii.gz \
-        ${mni_rois_dir}/${nsub}_${roi}_mni.nii.gz --data_type int16 -f
+            ${mni_rois_dir}/${nsub}_${roi}_mni.nii.gz \
+            ${mni_rois_dir}/${nsub}_${roi}_mni.nii.gz --data_type int16 -f
     done
     echo "|------------- 2) Done -------------|"
     echo ""
