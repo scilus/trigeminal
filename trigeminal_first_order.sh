@@ -23,7 +23,7 @@ while getopts "s:m:o:t:g:" args; do
         s) s=${OPTARG};;
         m) m=${OPTARG};;
         o) o=${OPTARG};;
-	t) t=${OPTARG};;
+        t) t=${OPTARG};;
         g) g=${OPTARG};;
         *) usage;;
     esac
@@ -75,15 +75,15 @@ do
     echo ""
 
 
-    echo "|------------- 1) Registrations -------------|"
+    echo "|------------- 1) Register mni_masked in orig space -------------|"
     antsRegistrationSyNQuick.sh \
         -d 3 -f ${subject_dir}/${nsub}/tractoflow/*__t1_warped.nii.gz \
         -m ${mni_dir}/MNI/mni_masked.nii.gz \
         -t s -o ${out_dir}/${nsub}/orig_space/transfo/2orig_ \
-        -y 1 >> ${out_dir}/${nsub}/orig_space/transfo/2orig_log.txt \
-	    -n ${nb_thread}
+        -y 1 \
+        -n ${nb_thread} >> ${out_dir}/${nsub}/orig_space/transfo/2orig_log.txt
 
-    ## [ORIG-SPACE] Register all ROIs
+    ## [ORIG-SPACE] Register all ROIs -> ORIG
     for nroi in cp_left cp_right
     do
         antsApplyTransforms \
@@ -154,8 +154,8 @@ do
         -d 3 \
         -i ${orig_rois_dir}/${nsub}_${nroi}.nii.gz \
         -r ${mni_dir}/MNI/mni_masked.nii.gz \
-        -t ${out_dir}/${nsub}/orig_space/transfo/2orig_1InverseWarp.nii.gz \
         -t [${out_dir}/${nsub}/orig_space/transfo/2orig_0GenericAffine.mat, 1] \
+        -t ${out_dir}/${nsub}/orig_space/transfo/2orig_1InverseWarp.nii.gz \
         -o ${mni_rois_dir}/${nsub}_${nroi/orig/mni}.nii.gz \
         -n NearestNeighbor
 
