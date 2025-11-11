@@ -52,7 +52,7 @@ else
     theta_list=(20 30 40)
 fi
 
-fa_threshold=0.10
+fa_threshold=0.15
 npv_first_order=2222  #20000
 opposite_side=leftright
 
