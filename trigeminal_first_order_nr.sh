@@ -259,6 +259,23 @@ for nsub in ${subject_dir}/*/; do
                 ${mni_tracking_dir}/segmented/${nsub}_${nside}_spinal_${combo_tag}.trk \
                 ${mni_tracking_dir}/final/${nsub}_${nside}_spinal_${combo_tag}.trk -f
 
+
+
+# Length-filter ONLY the left spinal bundle: 61 < length < 66 mm
+if [ "${nside}" = "left" ]; then
+  scil_tractogram_filter_by_length \
+    "${mni_tracking_dir}/final/${nsub}_${nside}_spinal_${combo_tag}.trk" \
+    "${mni_tracking_dir}/final/${nsub}_${nside}_spinal_len61_66_${combo_tag}.trk" \
+    --minL 61 --maxL 66 --display_counts
+
+  # Overwrite the original filename so the rest of the pipeline (incl. merge) stays unchanged
+  mv -f \
+    "${mni_tracking_dir}/final/${nsub}_${nside}_spinal_len61_66_${combo_tag}.trk" \
+    "${mni_tracking_dir}/final/${nsub}_${nside}_spinal_${combo_tag}.trk"
+fi
+
+    
+
             scil_bundle_reject_outliers \
                 ${mni_tracking_dir}/segmented/${nsub}_${nside}_remaining_cp_${combo_tag}.trk \
                 ${mni_tracking_dir}/final/${nsub}_${nside}_remaining_cp_${combo_tag}.trk \
