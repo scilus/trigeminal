@@ -68,7 +68,8 @@ echo "Use GPU: " ${gpu}
 echo "Number of threads" ${nb_thread}
 echo "Tracking grid: steps=${step_list[*]}  thetas=${theta_list[*]}"
 
-for nsub in ${subject_dir}/*/; do
+#for nsub in ${subject_dir}/*/; do
+    nsub=${subject_dir}
     nsub=$(basename "$nsub")
 
     
@@ -338,4 +339,4 @@ fi
         fi
     done
     echo "|============= Concatenation done for ${nsub} =============|"
-done
+#done
