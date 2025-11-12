@@ -7,7 +7,7 @@ You will need scilpy 2.2.0 and ANTs to be installed in order to run these script
 
 The aparc.DKTatlas+aseg.mgz comes from Freesurfer >= 7.0 version. It is not
 included in older versions of Freesurfer output. You can use https://cbrain.ca/ 
-to run freesurfer effectivetily. 
+to run freesurfer effectively. 
 
 - trigeminal_first_order.sh
 - trigeminal_second_order.sh
