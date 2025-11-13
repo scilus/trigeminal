@@ -46,6 +46,9 @@ nb_thread=${t}
 step_size=${step_size}
 theta=${theta}
 
+# If the user provides both step size (-p) and theta (-e) values,
+# the script will use those specific parameters and perform a single run
+# of local_tracking (i.e., no ensemble tractography will be performed).
 
 if [ -n "${step_size}" ] && [ -n "${theta}" ]; then
     step_list=(${step_size})
