@@ -16,7 +16,7 @@
 #    .
 #    .
 
-usage() { echo "$(basename $0) [-s path/to/subjects] [-m path/to/mni] [-o output_dir] [-t nb_threads] [-p step_size] [-e theta_deg] -g true" 1>&2; exit 1; }
+usage() { echo "$(basename $0) [-s path/to/subject] [-m path/to/mni] [-o output_dir] [-t nb_threads] [-p step_size] [-e theta_deg] -g true" 1>&2; exit 1; }
 
 while getopts "s:m:o:t:g:p:e::" args; do
     case "${args}" in
