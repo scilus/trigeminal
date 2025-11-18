@@ -50,3 +50,13 @@ trigeminal_second_order.sh \
     -t 10 \ # Number of threads
     -g true # Use GPU
 ```
+
+### Apply atlas
+
+trigeminal_apply_atlas.sh \
+    -s path/to/input \
+    -m ROIs_clean/ \
+    -o my_results \
+    -a atlas/ \
+    -t 30 \ # Number of threads
+    -g true # Use GPU
