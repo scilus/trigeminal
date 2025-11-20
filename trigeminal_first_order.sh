@@ -2,6 +2,37 @@
 # TRIGEMINAL SYSTEM TRACTOGRAPHY - Samir Akeb (2022-2023)
 # TRIGEMINAL SYSTEM TRACTOGRAPHY - Arnaud Bore (2023-2024)
 
+
+
+# This script performs ensemble tractography of the trigeminal system using fODFs and FA maps
+# from TractoFlow. Anatomical ROIs from both FreeSurfer and the ROIs_mean MNI folder are used to
+# segment and virtually dissect the trigeminal nerve. Tracking is performed in original space over a
+# grid of (step size, theta) combinations, merged, transformed to MNI space, filtered and segmented 
+# into three components (mesencephalic, spinal, remaining nucleus). Final cleaned bundles are saved
+# in both original (orig_space) and MNI (mni_space) coordinate spaces.
+
+
+# EXAMPLE COMMAND
+#
+#   bash trigeminal_first_order.sh \
+#       -s /path/to/subject/folder/sub-01 \
+#       -m /path/to/ROIs_mean \
+#       -o /path/to/output_dir \
+#       -t 10 \
+#       -p 0.5 \
+#       -e 30 \
+#       -f 0.15 \
+#       -n 20000 \
+#       -g true
+#
+# Notes:
+#   - If -p (step) and -e (theta) are not provided, the script performs ensemble tracking using:
+#       step = {0.1, 0.5, 1.0}
+#       theta = {20, 30, 40}
+#   - GPU option (-g) accelerates local tracking when supported; omit it to run on CPU.
+
+
+
 # Input structure
 #
 #    [input]
@@ -36,7 +67,7 @@ while getopts "s:m:o:t:p:e:f:n:g:" args; do
         p) step_size=${OPTARG} ;;
         e) theta=${OPTARG} ;;
         f) fa_threshold=${OPTARG} ;;   
-        n) npv_first_order=${OPTARG} ;; 
+        n) npv_first_order=${OPTARG} ;;    
         g) gpu=${OPTARG} ;;
         *) usage;;
     esac
@@ -50,8 +81,7 @@ fi
 
 
 
-# If the user provides both step size (-p) and theta (-e) values,
-# the script will use those specific parameters and perform a single run
+# If the user provides both step size (-p) and theta (-e) values, the script will use those specific parameters and perform a single run
 # of local_tracking (i.e., no ensemble tractography will be performed).
 
 if [ -n "${step_size}" ] && [ -n "${theta}" ]; then
@@ -64,8 +94,12 @@ fi
 
 # Default values if not set
 fa_threshold=${fa_threshold:-0.15}
-npv_first_order=${npv_first_order:-2222}
+npv_first_order=${npv_first_order:-20000}
 
+
+# npv_first_order is the total number of seeds per voxel for the whole first-order tracking.
+# It is divided by the number of step/theta combinations.
+# The resulting npv_per_run is the number of seeds actually used in each run.
 
 # number of step/theta combos
 n_combos=$(( ${#step_list[@]} * ${#theta_list[@]} ))
@@ -105,6 +139,8 @@ orig_rois_dir=${output_dir}/${nsub}/orig_space/rois
 mni_rois_dir=${output_dir}/${nsub}/mni_space/rois
 orig_tracking_dir=${output_dir}/${nsub}/orig_space/tracking_first_order
 mni_tracking_root=${output_dir}/${nsub}/mni_space/tracking_first_order
+trials_dir=${orig_tracking_dir}/trials
+mkdir -p "${trials_dir}"
 
 echo ""
 echo "|------------- PROCESSING FIRST ORDER TGN TRACTOGRAPHY FOR ${nsub} -------------|"
@@ -205,8 +241,9 @@ for step_size in "${step_list[@]}"; do
     echo "|=== Running combo: ${combo_tag} ===|"
 
        
-    mkdir -p ${orig_tracking_dir}/${combo_tag}/orig
-  
+
+mkdir -p ${trials_dir}/${combo_tag}
+
 
 
 
@@ -218,7 +255,8 @@ for step_size in "${step_list[@]}"; do
             ${subject_dir}/tractoflow/${nsub}__fodf.nii.gz \
             ${orig_rois_dir}/${nsub}_cp_${nside}_orig.nii.gz \
             ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz \
-            ${orig_tracking_dir}/${combo_tag}/orig/${nsub}_${nside}_from_cp_${combo_tag}.trk \
+            #${orig_tracking_dir}/${combo_tag}/orig/${nsub}_${nside}_from_cp_${combo_tag}.trk \
+            ${trials_dir}/${combo_tag}/${nsub}_${nside}_from_cp_${combo_tag}.trk \
             --npv $npv_per_run \
             --step ${step_size} \
             --theta ${theta} \
@@ -242,7 +280,8 @@ for nside in left right; do
     for step_size in "${step_list[@]}"; do
       for theta in "${theta_list[@]}"; do
         combo_tag=step_${step_size}_theta_${theta}
-        f="${orig_tracking_dir}/${combo_tag}/orig/${nsub}_${nside}_from_cp_${combo_tag}.trk"
+        f="${trials_dir}/${combo_tag}/${nsub}_${nside}_from_cp_${combo_tag}.trk"
+
         if [[ -f "$f" ]]; then
             files+=("$f")
         fi 
@@ -267,7 +306,17 @@ done
 
 echo "|------------- 5) Register merged Tracking in MNI space -------------|"
 merged_mni_dir="${mni_tracking_root}/final_merged"
-mkdir -p "${merged_mni_dir}"/{orig,filtered,segmented,final}
+
+
+
+mkdir -p \
+    "${merged_mni_dir}/orig" \
+    "${merged_mni_dir}/filtered" \
+    "${merged_mni_dir}/final" \
+    "${merged_mni_dir}/segmented/ROIs" \
+    "${merged_mni_dir}/segmented/outliers" \
+    "${merged_mni_dir}/segmented/length"
+
 
 for nside in left right; do
   in_trk="${merged_orig_dir}/${nsub}_${nside}_from_cp_merged.trk"
@@ -320,6 +369,9 @@ done
     echo "|------------- 6) Done -------------|"
     echo ""
 
+# Remove intermediate MNI-space "orig" tractograms to avoid duplication on disk
+rm -rf "${merged_mni_dir}/orig"
+
 # =========================
 #  SEGMENT ONLY FINAL FILTERED FILE
 # =========================
@@ -330,21 +382,21 @@ for nside in left right; do
 
     ## Mesencephalic Tract (Top)
      scil_tractogram_filter_by_roi "${fin}" \
-       "${merged_mni_dir}/segmented/${nsub}_${nside}_mesencephalic.trk" \
-      --drawn_roi ${mni_dir}/MNI/upper_cut_brainstem.nii.gz 'any' 'include' \
-      --drawn_roi ${mni_dir}/MNI/coronal_plane.nii.gz 'any' 'include' \
-      --drawn_roi ${mni_dir}/MNI/coronal_plane_for_mesencephalic.nii.gz 'any' 'include' -f
+       "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_mesencephalic.trk"  \
+       --drawn_roi ${mni_dir}/MNI/upper_cut_brainstem.nii.gz 'any' 'include' \
+       --drawn_roi ${mni_dir}/MNI/coronal_plane.nii.gz 'any' 'include' \
+       --drawn_roi ${mni_dir}/MNI/coronal_plane_for_mesencephalic.nii.gz 'any' 'include' -f
 
 
     ## Spinal Tract (bottom)
     scil_tractogram_filter_by_roi "${fin}" \
-    "${merged_mni_dir}/segmented/${nsub}_${nside}_spinal.trk" \
-    --drawn_roi ${mni_dir}/MNI/lowest_cut_brainstem.nii.gz 'any' 'include' \
-    --drawn_roi ${mni_dir}/MNI/coronal_plane.nii.gz 'any' 'include' -f
+      "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_spinal.trk" \
+      --drawn_roi ${mni_dir}/MNI/lowest_cut_brainstem.nii.gz 'any' 'include' \
+      --drawn_roi ${mni_dir}/MNI/coronal_plane.nii.gz 'any' 'include' -f
 
     ## Two remaining nucleus/tract
     scil_tractogram_filter_by_roi "${fin}" \
-      "${merged_mni_dir}/segmented/${nsub}_${nside}_remaining_cp.trk" \
+      "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_remaining_cp.trk" \
       --drawn_roi ${mni_dir}/MNI/lower_cut_brainstem.nii.gz 'any' 'exclude' \
       --drawn_roi ${mni_dir}/MNI/upper_cut_brainstem.nii.gz 'any' 'exclude' \
       --drawn_roi ${mni_dir}/MNI/coronal_plane.nii.gz 'any' 'include' \
@@ -362,35 +414,59 @@ echo "|------------- 8) Cleaning ---------|"
 
 for nside in left right; do
     scil_bundle_reject_outliers \
-      "${merged_mni_dir}/segmented/${nsub}_${nside}_mesencephalic.trk" \
-      "${merged_mni_dir}/final/${nsub}_${nside}_mesencephalic.trk" -f
+     
+      
+
+      "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_mesencephalic.trk" \
+      "${merged_mni_dir}/segmented/outliers/${nsub}_${nside}_mesencephalic.trk" -f
+
+    cp "${merged_mni_dir}/segmented/outliers/${nsub}_${nside}_mesencephalic.trk" \
+       "${merged_mni_dir}/final/${nsub}_${nside}_mesencephalic.trk"
+
+
 
     scil_bundle_reject_outliers \
-      "${merged_mni_dir}/segmented/${nsub}_${nside}_spinal.trk" \
-      "${merged_mni_dir}/final/${nsub}_${nside}_spinal.trk" -f
+      "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_spinal.trk" \
+      "${merged_mni_dir}/segmented/outliers/${nsub}_${nside}_spinal.trk" -f
+
+    cp "${merged_mni_dir}/segmented/outliers/${nsub}_${nside}_spinal.trk" \
+       "${merged_mni_dir}/final/${nsub}_${nside}_spinal.trk"
+
 
 
     # Length-filter ONLY the left spinal bundle: 61 < length < 66 mm
     if [ "${nside}" = "left" ]; then
        scil_tractogram_filter_by_length \
+         
+         #"${merged_mni_dir}/final/${nsub}_${nside}_spinal_len61_66.trk" \
+         
+
          "${merged_mni_dir}/final/${nsub}_${nside}_spinal.trk" \
-         "${merged_mni_dir}/final/${nsub}_${nside}_spinal_len61_66.trk" \
+         "${merged_mni_dir}/segmented/length/${nsub}_${nside}_spinal_len61_66.trk" \
          --minL 61 --maxL 66 --display_counts
 
+
        # Overwrite the original filename so the rest of the pipeline (incl. merge) stays unchanged
-        mv -f \
-          "${merged_mni_dir}/final/${nsub}_${nside}_spinal_len61_66.trk" \
-          "${merged_mni_dir}/final/${nsub}_${nside}_spinal.trk"
+        #mv -f \
+          #"${merged_mni_dir}/final/${nsub}_${nside}_spinal_len61_66.trk" \
+          #"${merged_mni_dir}/final/${nsub}_${nside}_spinal.trk"
+       cp -f \
+        "${merged_mni_dir}/segmented/length/${nsub}_${nside}_spinal_len61_66.trk" \
+        "${merged_mni_dir}/final/${nsub}_${nside}_spinal.trk"
+
     fi
 
     
 
     scil_bundle_reject_outliers \
-       "${merged_mni_dir}/segmented/${nsub}_${nside}_remaining_cp.trk" \
-       "${merged_mni_dir}/final/${nsub}_${nside}_remaining_cp.trk" \
+       "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_remaining_cp.trk" \
+       "${merged_mni_dir}/segmented/outliers/${nsub}_${nside}_remaining_cp.trk" \
        --alpha 0.97
 
     cp_final="${merged_mni_dir}/final/${nsub}_${nside}_remaining_cp.trk"
+    cp "${merged_mni_dir}/segmented/outliers/${nsub}_${nside}_remaining_cp.trk" "${cp_final}"  
+
+    
 
     if [[ -f "${cp_final}" ]]; then
         scil_tractogram_filter_by_orientation \
@@ -405,3 +481,39 @@ done
     echo "|------------- 8) Done  -------------|"
     echo ""
     
+
+
+# =========================
+#  9) BRING FINAL MNI BUNDLES BACK TO ORIG SPACE
+# =========================
+
+echo "|------------- 9) [BACK-TO-ORIG] Register final MNI bundles to orig space -------------|"
+
+orig_final_dir="${orig_tracking_dir}/final_merged/final"
+mkdir -p "${orig_final_dir}"
+
+# We know:
+# - MNI final bundles: ${merged_mni_dir}/final/${nsub}_${nside}_<bundle>.trk
+# - We want orig-space final bundles in: ${orig_final_dir}/${nsub}_${nside}_<bundle>_orig.trk
+
+for nside in left right; do
+    for bundle in mesencephalic spinal remaining_cp; do
+        in_trk="${merged_mni_dir}/final/${nsub}_${nside}_${bundle}.trk"
+        out_trk="${orig_final_dir}/${nsub}_${nside}_${bundle}_orig.trk"
+
+        if [[ -f "${in_trk}" ]]; then
+            scil_tractogram_apply_transform \
+              "${in_trk}" \
+              "${subject_dir}/tractoflow/${nsub}__t1_warped.nii.gz" \
+              "${output_dir}/${nsub}/orig_space/transfo/2orig_0GenericAffine.mat" \
+              "${out_trk}" \
+              --in_deformation "${output_dir}/${nsub}/orig_space/transfo/2orig_1Warp.nii.gz" \
+              --remove_invalid -f
+        else
+            echo "WARN: Final MNI bundle not found for ${nside} ${bundle}, skipping back-to-orig."
+        fi
+    done
+done
+
+echo "|------------- 9) Done -------------|"
+echo ""
