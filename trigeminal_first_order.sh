@@ -463,6 +463,9 @@ for nside in left right; do
         --bdo ${mni_dir}/MNI/cube03_left_spinal.bdo 'any' 'exclude' \
         --bdo ${mni_dir}/MNI/cube04_left_spinal.bdo 'any' 'exclude' \
         --bdo ${mni_dir}/MNI/cube05_left_spinal.bdo 'any' 'exclude' \
+        --bdo "${mni_dir}/MNI/right_spinal4.bdo" 'any' 'exclude' \
+        --bdo "${mni_dir}/MNI/right_spinal5.bdo" 'any' 'exclude' \
+        --bdo "${mni_dir}/MNI/right_spinal6.bdo" 'any' 'exclude' -f
         --bdo ${mni_dir}/MNI/sphere01_left_spinal.bdo 'any' 'exclude' -f
 
     fi
