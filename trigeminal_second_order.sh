@@ -26,7 +26,7 @@ while getopts "s:m:o:g:" args; do
         g) g=${OPTARG};;
         *) usage;;
     esac
-donegit push origin Antoine_ROIs_PR_3
+done
 
 shift $((OPTIND-1))
 
@@ -88,9 +88,7 @@ do
 
     orig_rois_dir=${out_dir}/${nsub}/orig_space/rois
     mni_rois_dir=${out_dir}/${nsub}/mni_space/rois
-    orig_tracking_dir=${out_dir}/${nsub}/orig_space/tracking_second_ordergit push origin Antoine_ROIs_PR_3
-git push origin Antoine_ROIs_PR_3
-git push origin Antoine_ROIs_PR_3
+    orig_tracking_dir=${out_dir}/${nsub}/orig_space/tracking_second_order
 
     mni_tracking_dir_first_order=${out_dir}/${nsub}/mni_space/tracking_first_order
     mni_tracking_dir_second_order=${out_dir}/${nsub}/mni_space/tracking_second_order
@@ -130,9 +128,8 @@ git push origin Antoine_ROIs_PR_3
 
     scil_labels_combine ${orig_rois_dir}/${nsub}_left_thalamus_orig.nii.gz \
         --volume_ids ${orig_rois_dir}/${nsub}_aparc.DKTatlas+aseg_orig.nii.gz ${Left_Thalamus[*]} --merge_groups -f
-git push origin Antoine_ROIs_PR_3
-git push origin Antoine_ROIs_PR_3
-git push origin Antoine_ROIs_PR_3
+
+
 
     scil_labels_combine ${mni_rois_dir}/${nsub}_left_thalamus_mni.nii.gz \
         --volume_ids ${mni_rois_dir}/${nsub}_aparc.DKTatlas+aseg_mni.nii.gz ${Left_Thalamus[*]} --merge_groups -f
@@ -147,7 +144,7 @@ git push origin Antoine_ROIs_PR_3
             ${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz \
             ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz \
             ${orig_tracking_dir}/orig/${nsub}_${nside}_from_spinal_track_npv1000.trk \
-            --npv ${npv_from_spinal_track_long} \--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_1.bdo 'any' 'exclude'\ --bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_1.bdo 'any' 'exclude'\ 
+            --npv ${npv_from_spinal_track_long} \ 
             -v -f ${gpu}
 
         # Tracking from Spinal bundle - npv 100
@@ -167,8 +164,7 @@ git push origin Antoine_ROIs_PR_3
             ${orig_rois_dir}/${nsub}_${nside}_thalamus_orig.nii.gz \
             ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz\
             ${orig_tracking_dir}/orig/${nsub}_${nside}_from_thalamus_npv500.trk \
-            --npv ${npv_from_thalamus_track} \git push origin Antoine_ROIs_PR_3
-git push origin Antoine_ROIs_PR_3
+            --npv ${npv_from_thalamus_track} \
 
             -v -f ${gpu}
     done
@@ -258,7 +254,7 @@ git push origin Antoine_ROIs_PR_3
             ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz \
             ${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_mni.nii.gz \
             --data_type uint8 -f
-        scil_labels_from_mask ${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_mni.nii.gz \--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_1.bdo 'any' 'exclude'\ 
+        scil_labels_from_mask ${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_mni.nii.gz \ 
             ${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_labels_mni.nii.gz \
             -f
     done
