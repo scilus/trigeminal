@@ -26,7 +26,8 @@ while getopts "s:m:o:g:" args; do
         g) g=${OPTARG};;
         *) usage;;
     esac
-done
+donegit push origin Antoine_ROIs_PR_3
+
 shift $((OPTIND-1))
 
 if [ -z "${s}" ] || [ -z "${m}" ] || [ -z "${o}" ]; then
@@ -87,7 +88,10 @@ do
 
     orig_rois_dir=${out_dir}/${nsub}/orig_space/rois
     mni_rois_dir=${out_dir}/${nsub}/mni_space/rois
-    orig_tracking_dir=${out_dir}/${nsub}/orig_space/tracking_second_order
+    orig_tracking_dir=${out_dir}/${nsub}/orig_space/tracking_second_ordergit push origin Antoine_ROIs_PR_3
+git push origin Antoine_ROIs_PR_3
+git push origin Antoine_ROIs_PR_3
+
     mni_tracking_dir_first_order=${out_dir}/${nsub}/mni_space/tracking_first_order
     mni_tracking_dir_second_order=${out_dir}/${nsub}/mni_space/tracking_second_order
 
@@ -126,6 +130,9 @@ do
 
     scil_labels_combine ${orig_rois_dir}/${nsub}_left_thalamus_orig.nii.gz \
         --volume_ids ${orig_rois_dir}/${nsub}_aparc.DKTatlas+aseg_orig.nii.gz ${Left_Thalamus[*]} --merge_groups -f
+git push origin Antoine_ROIs_PR_3
+git push origin Antoine_ROIs_PR_3
+git push origin Antoine_ROIs_PR_3
 
     scil_labels_combine ${mni_rois_dir}/${nsub}_left_thalamus_mni.nii.gz \
         --volume_ids ${mni_rois_dir}/${nsub}_aparc.DKTatlas+aseg_mni.nii.gz ${Left_Thalamus[*]} --merge_groups -f
@@ -140,7 +147,7 @@ do
             ${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz \
             ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz \
             ${orig_tracking_dir}/orig/${nsub}_${nside}_from_spinal_track_npv1000.trk \
-            --npv ${npv_from_spinal_track_long} \
+            --npv ${npv_from_spinal_track_long} \--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_1.bdo 'any' 'exclude'\ --bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_1.bdo 'any' 'exclude'\ 
             -v -f ${gpu}
 
         # Tracking from Spinal bundle - npv 100
@@ -160,7 +167,9 @@ do
             ${orig_rois_dir}/${nsub}_${nside}_thalamus_orig.nii.gz \
             ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz\
             ${orig_tracking_dir}/orig/${nsub}_${nside}_from_thalamus_npv500.trk \
-            --npv ${npv_from_thalamus_track} \
+            --npv ${npv_from_thalamus_track} \git push origin Antoine_ROIs_PR_3
+git push origin Antoine_ROIs_PR_3
+
             -v -f ${gpu}
     done
 
@@ -249,7 +258,7 @@ do
             ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz \
             ${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_mni.nii.gz \
             --data_type uint8 -f
-        scil_labels_from_mask ${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_mni.nii.gz \
+        scil_labels_from_mask ${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_mni.nii.gz \--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_1.bdo 'any' 'exclude'\ 
             ${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_labels_mni.nii.gz \
             -f
     done
@@ -279,7 +288,11 @@ do
             --drawn_roi ${mni_dir}/MNI/from_${nside}/VTTT_Controlat_EXC_CaudalMedulla_Controlat.nii.gz 'any' 'exclude' \
             --drawn_roi ${mni_dir}/MNI/from_${nside}/VTTT_Controlat_INC_VTT_Area.nii.gz 'any' 'include' \
             --drawn_roi ${mni_dir}/MNI/from_${nside}/VTTT_Controlat_EXC_Pons_Ipsilat.nii.gz 'any' 'exclude' \
-            --drawn_roi ${mni_dir}/MNI/cs_plaque.nii.gz 'any' 'exclude' -f
+            --drawn_roi ${mni_dir}/MNI/cs_plaque.nii.gz 'any' 'exclude'\
+            --drawn_roi ${mni_dir}/MNI/from_${nside}/VTTT_Controlat_INC_VTT_Area.nii.gz 'any' 'include'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/VTTT_Controlat_OSandIS_1.bdo 'any' 'exclude'\ 
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/VTTT_Controlat_OSandIS_2.bdo 'any' 'exclude' -f
+
 
         ## vPSN
         ## VPM
@@ -311,7 +324,11 @@ do
             --drawn_roi ${mni_dir}/MNI/from_${contra_nside}/VTTT_Controlat_EXC_Ventral_Brainstem.nii.gz 'any' 'exclude' \
             --drawn_roi ${mni_dir}/MNI/from_${contra_nside}/DTTT_Controlat_INC_CaudalMedulla_Ipsilat.nii.gz 'any' 'include' \
             --drawn_roi ${mni_dir}/MNI/from_${contra_nside}/DTTT_Controlat_INC_Medulla_Controlat.nii.gz 'any' 'include' \
-            --drawn_roi ${mni_dir}/MNI/from_${contra_nside}/DTTT_Controlat_EXC_Midbrain_Ipsilat.nii.gz 'any' 'exclude' -f
+            --drawn_roi ${mni_dir}/MNI/from_${contra_nside}/DTTT_Controlat_EXC_Midbrain_Ipsilat.nii.gz 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_1.bdo 'any' 'exclude'\ 
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_2.bdo 'any' 'exclude'\ 
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_3.bdo 'any' 'exclude'\ 
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_4.bdo 'any' 'exclude' -f
 
         echo "|------------- 3.3) ${nside} - DTTT (ipsilateral) - dPSN and CS -------------|"
         ## CS
@@ -322,15 +339,28 @@ do
             --drawn_roi ${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz 'either_end' 'include' \
             --drawn_roi ${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz 'any' 'include' \
             --drawn_roi ${mni_dir}/MNI/from_${nside}/VTTT_Controlat_EXC_Ventral_Brainstem.nii.gz 'any' 'exclude' \
-            --drawn_roi ${mni_dir}/MNI/midsagittal_plane.nii.gz 'any' 'exclude' -f
-
+            --drawn_roi ${mni_dir}/MNI/midsagittal_plane.nii.gz 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_1.bdo 'any' 'exclude'\ 
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_2.bdo 'any' 'exclude'\ 
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_3.bdo 'any' 'exclude' -f
+			
         ## dPSN
         ## VPM/Thalamus
         scil_tractogram_filter_by_roi \
             ${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv1000.trk \
             ${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_dPSN.trk \
             --drawn_roi ${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz 'any' 'include' \
-            --drawn_roi ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz 'either_end' 'include' -f
+            --drawn_roi ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz 'either_end' 'include'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_1.bdo 'any' 'exclude'\ 
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_2.bdo 'any' 'exclude'\ 
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_3.bdo 'any' 'exclude'\ 
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_4.bdo 'any' 'exclude'\ 
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_5.bdo 'any' 'exclude'\ 
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_6.bdo 'any' 'exclude'\ 
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_7.bdo 'any' 'exclude'\ 
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_8.bdo 'any' 'exclude' -f
+			
+			
     done
     echo "|------------- 3) Done -------------|"
     echo ""
