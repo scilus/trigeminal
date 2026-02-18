@@ -286,8 +286,9 @@ do
             --drawn_roi ${mni_dir}/MNI/from_${nside}/VTTT_Controlat_EXC_Pons_Ipsilat.nii.gz 'any' 'exclude' \
             --drawn_roi ${mni_dir}/MNI/cs_plaque.nii.gz 'any' 'exclude'\
             --drawn_roi ${mni_dir}/MNI/from_${nside}/VTTT_Controlat_INC_VTT_Area.nii.gz 'any' 'include'\
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/VTTT_Controlat_OSandIS_1.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/VTTT_Controlat_OSandIS_2.bdo 'any' 'exclude' -f
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/VTTT_Controlat_OSandIS_1.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/VTTT_Controlat_OSandIS_2.bdo 'any' 'exclude'\
+			-f
 
 
         ## vPSN
@@ -302,12 +303,13 @@ do
             --drawn_roi ${mni_dir}/MNI/from_${nside}/VTTT_Controlat_EXC_Ventral_Brainstem.nii.gz 'any' 'exclude' \
             --drawn_roi ${mni_dir}/MNI/from_${nside}/VTTT_Controlat_EXC_CaudalMedulla_Controlat.nii.gz 'any' 'exclude' \
             --drawn_roi ${mni_dir}/MNI/from_${nside}/VTTT_Controlat_INC_VTT_Area.nii.gz 'any' 'include'\
-			--bdo ${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_1.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_2.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_3.bdo 'any' 'exclude'\ 
+			--bdo ${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_1.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_2.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_3.bdo 'any' 'exclude'\
 			--bdo ${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_4.bdo 'any' 'exclude'\
 			--bdo ${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_5.bdo 'any' 'exclude'\
-			--bdo ${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_6.bdo 'any' 'exclude' -f
+			--bdo ${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_6.bdo 'any' 'exclude'\
+			-f
 
 
 
@@ -321,10 +323,11 @@ do
             --drawn_roi ${mni_dir}/MNI/from_${contra_nside}/DTTT_Controlat_INC_CaudalMedulla_Ipsilat.nii.gz 'any' 'include' \
             --drawn_roi ${mni_dir}/MNI/from_${contra_nside}/DTTT_Controlat_INC_Medulla_Controlat.nii.gz 'any' 'include' \
             --drawn_roi ${mni_dir}/MNI/from_${contra_nside}/DTTT_Controlat_EXC_Midbrain_Ipsilat.nii.gz 'any' 'exclude'\
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_1.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_2.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_3.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_4.bdo 'any' 'exclude' -f
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_1.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_2.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_3.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_4.bdo 'any' 'exclude'\
+			-f
 
         echo "|------------- 3.3) ${nside} - DTTT (ipsilateral) - dPSN and CS -------------|"
         ## CS
@@ -335,10 +338,11 @@ do
             --drawn_roi ${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz 'either_end' 'include' \
             --drawn_roi ${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz 'any' 'include' \
             --drawn_roi ${mni_dir}/MNI/from_${nside}/VTTT_Controlat_EXC_Ventral_Brainstem.nii.gz 'any' 'exclude' \
-            --drawn_roi ${mni_dir}/MNI/midsagittal_plane.nii.gz 'any' 'exclude'\
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_1.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_2.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_3.bdo 'any' 'exclude' -f
+			--drawn_roi ${mni_dir}/MNI/midsagittal_plane.nii.gz 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_1.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_2.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_3.bdo 'any' 'exclude'\
+			-f
 			
         ## dPSN
         ## VPM/Thalamus
@@ -347,14 +351,15 @@ do
             ${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_dPSN.trk \
             --drawn_roi ${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz 'any' 'include' \
             --drawn_roi ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz 'either_end' 'include'\
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_1.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_2.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_3.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_4.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_5.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_6.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_7.bdo 'any' 'exclude'\ 
-			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_8.bdo 'any' 'exclude' -f
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_1.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_2.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_3.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_4.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_5.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_6.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_7.bdo 'any' 'exclude'\
+			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_8.bdo 'any' 'exclude'\
+			-f
 			
 			
     done
