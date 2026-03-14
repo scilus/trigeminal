@@ -58,7 +58,7 @@ mkdir -p ${out_dir}/mni_space/tracking_first_order/final/
 
 for nside in left right
 do
-    scil_tractogram_math union ${out_dir}/*/mni_space/tracking_first_order/final/*_${nside}_spinal.trk \
+    scil_tractogram_math union ${out_dir}/*/mni_space/tracking_first_order/final_merged/final/*_${nside}_spinal.trk \
         ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal.trk -f
 
     # Building seeding mask by converting spinal bundle TRK to NII
@@ -67,7 +67,7 @@ do
         ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal_density_second_order_seed_mni.nii.gz \
         --binary -f
 
-    scil_tractogram_math union ${out_dir}/*/mni_space/tracking_first_order/final/*_${nside}_remaining_cp.trk \
+    scil_tractogram_math union ${out_dir}/*/mni_space/tracking_first_order/final_merged/final/*_${nside}_remaining_cp.trk \
         ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp.trk -f
 
     # Building mask by converting remaining_cp bundle TRK to NII
@@ -102,7 +102,7 @@ do
     echo "|------------- 1.2) Seeding Mask + Registration in orig space  -------------|"
     for nside in left right
     do
-    	cp ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal_density_second_order_seed_mni.nii.gz \
+        cp ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal_density_second_order_seed_mni.nii.gz \
             ${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz
 
         # Register density into orig space
@@ -204,13 +204,13 @@ do
     echo "|------------- 2.2) Generate masks -------------|"
     for nside in left right
     do
-    	if [ "$nside" == "left" ]; then
-    		contra_nside="right";
-    	else
-    		contra_nside="left";
-    	fi
+        if [ "$nside" == "left" ]; then
+            contra_nside="right";
+        else
+            contra_nside="left";
+        fi
 
-       # Generate Cutting masks for DTTT (ipsilateral)
+        # Generate Cutting masks for DTTT (ipsilateral)
         ## For dPSN : Remaining_CP to VPM
         scil_volume_math union ${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz \
             ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz \
@@ -264,11 +264,11 @@ do
     echo "|------------- 3) Generate Second-order bundles for trigeminal system -------------|"
     for nside in left right
     do
-	if [ "$nside" == "left" ]; then
-    		contra_nside="right";
-    	else
-    		contra_nside="left";
-    	fi
+        if [ "$nside" == "left" ]; then
+            contra_nside="right";
+        else
+            contra_nside="left";
+        fi
 
         echo "|------------- 3.1) From ${nside} - VTTT (only controlateral) - OS/IS and vPSN -------------|"
         # OS and IS
@@ -369,11 +369,11 @@ do
     echo "|------------- 4) Cutting the Second-order bundles -------------|"
     for nside in left right
     do
-    	if [ "$nside" == "left" ]; then
-    		contra_nside="right";
-    	else
-    		contra_nside="left";
-    	fi
+        if [ "$nside" == "left" ]; then
+            contra_nside="right";
+        else
+            contra_nside="left";
+        fi
         echo "|------------- 4.1) ${nside} - VTTT (only controlateral) - vPSN and OS/IS -------------|"
         #OS and IS - STEP 1
         scil_tractogram_cut_streamlines \
