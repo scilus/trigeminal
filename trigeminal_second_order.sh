@@ -110,7 +110,7 @@ do
     antsApplyTransforms \
         -d 3 \
         -i ${output_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal_density_second_order_seed_mni.nii.gz \
-        -r ${subject_dir}/${nsub}/tractoflow/${nsub}__t1_warped.nii.gz \
+        -r ${subject_dir}/tractoflow/${nsub}__t1_warped.nii.gz \
         -t ${output_dir}/${nsub}/orig_space/transfo/2orig_1Warp.nii.gz \
         -t ${output_dir}/${nsub}/orig_space/transfo/2orig_0GenericAffine.mat \
         -o ${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz
@@ -139,7 +139,7 @@ do
     # Tracking from Spinal bundle - npv 1000
     echo "|------------- 1.4a) Tracking from Spinal bundle - npv ${npv_from_spinal_track_long}  -------------|"
     scil_tracking_local \
-        ${subject_dir}/${nsub}/tractoflow/${nsub}__fodf.nii.gz \
+        ${subject_dir}/tractoflow/${nsub}__fodf.nii.gz \
         ${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz \
         ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz \
         ${orig_tracking_dir}/orig/${nsub}_${nside}_from_spinal_track_npv1000.trk \
@@ -149,7 +149,7 @@ do
     # Tracking from Spinal bundle - npv 100
     echo "|------------- 1.4b) Tracking from Spinal bundle - npv ${npv_from_spinal_track_short}  -------------|"
     scil_tracking_local \
-        ${subject_dir}/${nsub}/tractoflow/${nsub}__fodf.nii.gz \
+        ${subject_dir}/tractoflow/${nsub}__fodf.nii.gz \
         ${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz \
         ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz \
         ${orig_tracking_dir}/orig/${nsub}_${nside}_from_spinal_track_npv100.trk \
@@ -159,7 +159,7 @@ do
     # Tracking from Thalamus
     echo "|------------- 1.4c) Tracking from Thalamus - npv ${npv_from_thalamus_track}  -------------|"
     scil_tracking_local \
-        ${subject_dir}/${nsub}/tractoflow/${nsub}__fodf.nii.gz \
+        ${subject_dir}/tractoflow/${nsub}__fodf.nii.gz \
         ${orig_rois_dir}/${nsub}_${nside}_thalamus_orig.nii.gz \
         ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz\
         ${orig_tracking_dir}/orig/${nsub}_${nside}_from_thalamus_npv500.trk \
