@@ -35,9 +35,10 @@ if [ -z "${subject_dir}" ] || [ -z "${mni_dir}" ] || [ -z "${output_dir}" ]; the
     usage
 fi
 
-gpu=""
-if [ -n "${gpu}" ]; then
+if [ ! -z "${gpu}" ]; then
     gpu="--use_gpu"
+else
+    gpu=""
 fi
 
 fa_threshold=0.15
