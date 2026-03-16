@@ -16,34 +16,31 @@
 #    .
 #    .
 
-usage() { echo "$(basename $0) [-s path/to/subjects] [-m path/to/mni] [-o output_dir] [-g] (if you have a gpu)" 1>&2; exit 1; }
+usage() { echo "$(basename $0) [-s path/to/subject] [-m path/to/mni] [-o output_dir] [-t nb_threads] [-g] (if you have a gpu)" 1>&2; exit 1; }
 
-while getopts "s:m:o:g:" args; do
+while getopts "s:m:o:t:g:" args; do
     case "${args}" in
-        s) s=${OPTARG};;
-        m) m=${OPTARG};;
-        o) o=${OPTARG};;
-        g) g=${OPTARG};;
+        s) subject_dir=${OPTARG};;
+        m) mni_dir=${OPTARG};;
+        o) output_dir=${OPTARG};;
+	t) nb_threads=${OPTARG} ;;
+        g) gpu=${OPTARG};;
         *) usage;;
     esac
 done
 
 shift $((OPTIND-1))
 
-if [ -z "${s}" ] || [ -z "${m}" ] || [ -z "${o}" ]; then
+if [ -z "${subject_dir}" ] || [ -z "${mni_dir}" ] || [ -z "${output_dir}" ]; then
     usage
 fi
 
 gpu=""
-if [ -n "${g}" ]; then
+if [ -n "${gpu}" ]; then
     gpu="--use_gpu"
 fi
 
-subject_dir=${s}
-mni_dir=${m}
-out_dir=${o}
-
-fa_threshold=0.20
+fa_threshold=0.15
 
 npv_from_spinal_track_long=1000
 npv_from_spinal_track_short=100
@@ -51,144 +48,147 @@ npv_from_thalamus_track=500
 
 echo "Folder subjects: " ${subject_dir}
 echo "Folder MNI: " ${mni_dir}
-echo "Output folder: " ${out_dir}
+echo "Output folder: " ${output_dir}
 echo "GPU: " ${gpu}
 
-mkdir -p ${out_dir}/mni_space/tracking_first_order/final/
+nsub=$(basename "${subject_dir}")
+subject_parent=$(dirname "${subject_dir}")
+
+mkdir -p ${output_dir}/mni_space/tracking_first_order/final/
+mkdir -p ${output_dir}/${nsub}/orig_space/{rois,tracking_second_order,transfo}
+mkdir -p ${output_dir}/${nsub}/orig_space/tracking_second_order/orig
+mkdir -p ${output_dir}/${nsub}/mni_space/{rois,tracking_second_order}
+mkdir -p ${output_dir}/${nsub}/mni_space/tracking_second_order/{orig,filtered,segmented,final,cut}
+
+orig_rois_dir=${output_dir}/${nsub}/orig_space/rois
+mni_rois_dir=${output_dir}/${nsub}/mni_space/rois
+orig_tracking_dir=${output_dir}/${nsub}/orig_space/tracking_second_order
+
+mni_tracking_dir_first_order=${output_dir}/${nsub}/mni_space/tracking_first_order
+mni_tracking_dir_second_order=${output_dir}/${nsub}/mni_space/tracking_second_order
+
+echo ""
+echo "|------------- PROCESSING SECOND ORDER TGN TRACTOGRAPHY -------------|"
+echo ""
+
+echo "|------------- 0) Create masks from all spinal and all remaining_cp -------------|"
+export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS="${nb_threads}"
 
 for nside in left right
 do
-    scil_tractogram_math union ${out_dir}/*/mni_space/tracking_first_order/final_merged/final/*_${nside}_spinal.trk \
-        ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal.trk -f
+    scil_tractogram_math union ${output_dir}/*/mni_space/tracking_first_order/final_merged/final/*_${nside}_spinal.trk \
+        ${output_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal.trk -f
 
     # Building seeding mask by converting spinal bundle TRK to NII
     scil_tractogram_compute_density_map \
-        ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal.trk \
-        ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal_density_second_order_seed_mni.nii.gz \
+        ${output_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal.trk \
+        ${output_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal_density_second_order_seed_mni.nii.gz \
         --binary -f
 
-    scil_tractogram_math union ${out_dir}/*/mni_space/tracking_first_order/final_merged/final/*_${nside}_remaining_cp.trk \
-        ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp.trk -f
+    scil_tractogram_math union ${output_dir}/*/mni_space/tracking_first_order/final_merged/final/*_${nside}_remaining_cp.trk \
+        ${output_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp.trk -f
 
     # Building mask by converting remaining_cp bundle TRK to NII
     scil_tractogram_compute_density_map \
-        ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp.trk \
-        ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz \
+        ${output_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp.trk \
+        ${output_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz \
         --binary -f
 done
 
-for nsub in ${subject_dir}/*/
+
+echo ""
+echo "|------------- PROCESSING FIRST ORDER TGN TRACTOGRAPHY FOR ${nsub} -------------|"
+echo ""
+
+echo "|------------- 1) Generate local tractography with spinal bundle  -------------|"
+echo "|------------- 1.2) Seeding Mask + Registration in orig space  -------------|"
+for nside in left right
 do
-    nsub=`basename "$nsub"`
+   cp ${output_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal_density_second_order_seed_mni.nii.gz \
+       ${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz
 
-    mkdir -p ${out_dir}/${nsub}/orig_space/{rois,tracking_second_order,transfo}
-    mkdir -p ${out_dir}/${nsub}/orig_space/tracking_second_order/orig
-    mkdir -p ${out_dir}/${nsub}/mni_space/{rois,tracking_second_order}
-    mkdir -p ${out_dir}/${nsub}/mni_space/tracking_second_order/{orig,filtered,segmented,final,cut}
+   # Register density into orig space
+   antsApplyTransforms \
+       -d 3 \
+       -i ${output_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal_density_second_order_seed_mni.nii.gz \
+       -r ${subject_dir}/${nsub}/tractoflow/${nsub}__t1_warped.nii.gz \
+       -t ${output_dir}/${nsub}/orig_space/transfo/2orig_1Warp.nii.gz \
+       -t ${output_dir}/${nsub}/orig_space/transfo/2orig_0GenericAffine.mat \
+       -o ${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz
+done
 
-    orig_rois_dir=${out_dir}/${nsub}/orig_space/rois
-    mni_rois_dir=${out_dir}/${nsub}/mni_space/rois
-    orig_tracking_dir=${out_dir}/${nsub}/orig_space/tracking_second_order
+echo "|------------- 1.3) Extract thalamus -------------|"
 
-    mni_tracking_dir_first_order=${out_dir}/${nsub}/mni_space/tracking_first_order
-    mni_tracking_dir_second_order=${out_dir}/${nsub}/mni_space/tracking_second_order
+Right_Thalamus=(49)
+Left_Thalamus=(10)
 
-    echo ""
-    echo "|------------- PROCESSING SECOND-ORDER FIBERS TRACTOGRAPHY FOR TRIGEMINAL SYSTEM -------------|"
-    echo "|------------- FOR DATASET ${nsub} -------------|"
-    echo ""
+scil_labels_combine ${orig_rois_dir}/${nsub}_right_thalamus_orig.nii.gz \
+    --volume_ids ${orig_rois_dir}/${nsub}_aparc.DKTatlas+aseg_orig.nii.gz ${Right_Thalamus[*]} --merge_groups -f
 
-    echo "|------------- 1) Generate local tractography with spinal bundle  -------------|"
-    echo "|------------- 1.2) Seeding Mask + Registration in orig space  -------------|"
+scil_labels_combine ${mni_rois_dir}/${nsub}_right_thalamus_mni.nii.gz \
+    --volume_ids ${mni_rois_dir}/${nsub}_aparc.DKTatlas+aseg_mni.nii.gz ${Right_Thalamus[*]} --merge_groups -f
+
+scil_labels_combine ${orig_rois_dir}/${nsub}_left_thalamus_orig.nii.gz \
+    --volume_ids ${orig_rois_dir}/${nsub}_aparc.DKTatlas+aseg_orig.nii.gz ${Left_Thalamus[*]} --merge_groups -f
+
+scil_labels_combine ${mni_rois_dir}/${nsub}_left_thalamus_mni.nii.gz \
+    --volume_ids ${mni_rois_dir}/${nsub}_aparc.DKTatlas+aseg_mni.nii.gz ${Left_Thalamus[*]} --merge_groups -f
+
+echo "|------------- 1.4) Tracking  -------------|"
+for nside in left right
+do
+    # Tracking from Spinal bundle - npv 1000
+    echo "|------------- 1.4a) Tracking from Spinal bundle - npv ${npv_from_spinal_track_long}  -------------|"
+    scil_tracking_local \
+        ${subject_dir}/${nsub}/tractoflow/${nsub}__fodf.nii.gz \
+        ${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz \
+        ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz \
+        ${orig_tracking_dir}/orig/${nsub}_${nside}_from_spinal_track_npv1000.trk \
+        --npv ${npv_from_spinal_track_long} \ 
+        -v -f ${gpu}
+
+    # Tracking from Spinal bundle - npv 100
+    echo "|------------- 1.4b) Tracking from Spinal bundle - npv ${npv_from_spinal_track_short}  -------------|"
+    scil_tracking_local \
+        ${subject_dir}/${nsub}/tractoflow/${nsub}__fodf.nii.gz \
+        ${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz \
+        ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz \
+        ${orig_tracking_dir}/orig/${nsub}_${nside}_from_spinal_track_npv100.trk \
+        --npv ${npv_from_spinal_track_short} \
+        -v -f ${gpu}
+
+    # Tracking from Thalamus
+    echo "|------------- 1.4c) Tracking from Thalamus - npv ${npv_from_thalamus_track}  -------------|"
+    scil_tracking_local \
+        ${subject_dir}/${nsub}/tractoflow/${nsub}__fodf.nii.gz \
+        ${orig_rois_dir}/${nsub}_${nside}_thalamus_orig.nii.gz \
+        ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz\
+        ${orig_tracking_dir}/orig/${nsub}_${nside}_from_thalamus_npv500.trk \
+        --npv ${npv_from_thalamus_track} \
+        -v -f ${gpu}
+done
+
+echo "|------------- 1.5) Register Tracking in MNI space -------------|"
+for ntracking in from_thalamus_npv500.trk from_spinal_track_npv100.trk from_spinal_track_npv1000.trk
+do
     for nside in left right
     do
-        cp ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal_density_second_order_seed_mni.nii.gz \
-            ${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz
-
-        # Register density into orig space
-        antsApplyTransforms \
-            -d 3 \
-            -i ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_spinal_density_second_order_seed_mni.nii.gz \
-            -r ${subject_dir}/${nsub}/tractoflow/${nsub}__t1_warped.nii.gz \
-            -t ${out_dir}/${nsub}/orig_space/transfo/2orig_1Warp.nii.gz \
-            -t ${out_dir}/${nsub}/orig_space/transfo/2orig_0GenericAffine.mat \
-            -o ${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz
+        scil_tractogram_apply_transform \
+            ${orig_tracking_dir}/orig/${nsub}_${nside}_${ntracking} \
+            ${mni_dir}/MNI/mni_masked.nii.gz \
+            ${output_dir}/${nsub}/orig_space/transfo/2orig_0GenericAffine.mat \
+            ${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_${ntracking} \
+            --in_deformation ${output_dir}/${nsub}/orig_space/transfo/2orig_1Warp.nii.gz \
+            --remove_invalid \
+            --reverse_operation -f
     done
+done
 
-    echo "|------------- 1.3) Extract thalamus -------------|"
+echo "|------------- 1) Done -------------|"
+echo ""
 
-    Right_Thalamus=(49)
-    Left_Thalamus=(10)
-
-    scil_labels_combine ${orig_rois_dir}/${nsub}_right_thalamus_orig.nii.gz \
-        --volume_ids ${orig_rois_dir}/${nsub}_aparc.DKTatlas+aseg_orig.nii.gz ${Right_Thalamus[*]} --merge_groups -f
-
-    scil_labels_combine ${mni_rois_dir}/${nsub}_right_thalamus_mni.nii.gz \
-        --volume_ids ${mni_rois_dir}/${nsub}_aparc.DKTatlas+aseg_mni.nii.gz ${Right_Thalamus[*]} --merge_groups -f
-
-    scil_labels_combine ${orig_rois_dir}/${nsub}_left_thalamus_orig.nii.gz \
-        --volume_ids ${orig_rois_dir}/${nsub}_aparc.DKTatlas+aseg_orig.nii.gz ${Left_Thalamus[*]} --merge_groups -f
-
-
-
-    scil_labels_combine ${mni_rois_dir}/${nsub}_left_thalamus_mni.nii.gz \
-        --volume_ids ${mni_rois_dir}/${nsub}_aparc.DKTatlas+aseg_mni.nii.gz ${Left_Thalamus[*]} --merge_groups -f
-
-    echo "|------------- 1.4) Tracking  -------------|"
-    for nside in left right
-    do
-        # Tracking from Spinal bundle - npv 1000
-        echo "|------------- 1.4a) Tracking from Spinal bundle - npv ${npv_from_spinal_track_long}  -------------|"
-        scil_tracking_local \
-            ${subject_dir}/${nsub}/tractoflow/${nsub}__fodf.nii.gz \
-            ${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz \
-            ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz \
-            ${orig_tracking_dir}/orig/${nsub}_${nside}_from_spinal_track_npv1000.trk \
-            --npv ${npv_from_spinal_track_long} \ 
-            -v -f ${gpu}
-
-        # Tracking from Spinal bundle - npv 100
-        echo "|------------- 1.4b) Tracking from Spinal bundle - npv ${npv_from_spinal_track_short}  -------------|"
-        scil_tracking_local \
-            ${subject_dir}/${nsub}/tractoflow/${nsub}__fodf.nii.gz \
-            ${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz \
-            ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz \
-            ${orig_tracking_dir}/orig/${nsub}_${nside}_from_spinal_track_npv100.trk \
-            --npv ${npv_from_spinal_track_short} \
-            -v -f ${gpu}
-
-        # Tracking from Thalamus
-        echo "|------------- 1.4c) Tracking from Thalamus - npv ${npv_from_thalamus_track}  -------------|"
-        scil_tracking_local \
-            ${subject_dir}/${nsub}/tractoflow/${nsub}__fodf.nii.gz \
-            ${orig_rois_dir}/${nsub}_${nside}_thalamus_orig.nii.gz \
-            ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz\
-            ${orig_tracking_dir}/orig/${nsub}_${nside}_from_thalamus_npv500.trk \
-            --npv ${npv_from_thalamus_track} \
-
-            -v -f ${gpu}
-    done
-
-    echo "|------------- 1.5) Register Tracking in MNI space -------------|"
-    for ntracking in from_thalamus_npv500.trk from_spinal_track_npv100.trk from_spinal_track_npv1000.trk
-    do
-        for nside in left right
-        do
-            scil_tractogram_apply_transform \
-                ${orig_tracking_dir}/orig/${nsub}_${nside}_${ntracking} \
-                ${mni_dir}/MNI/mni_masked.nii.gz \
-                ${out_dir}/${nsub}/orig_space/transfo/2orig_0GenericAffine.mat \
-                ${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_${ntracking} \
-                --in_deformation ${out_dir}/${nsub}/orig_space/transfo/2orig_1Warp.nii.gz \
-                --remove_invalid \
-                --reverse_operation -f
-        done
-    done
-    echo "|------------- 1) Done -------------|"
-    echo ""
-
-    echo "|------------- 2) Generate ROIs -------------|"
-    echo "|------------- 2.1) Registration VPM -------------|"
+echo "|------------- 2) Generate ROIs -------------|"
+echo "|------------- 2.1) Registration VPM -------------|"
 
     for nside in left right
     do
@@ -213,7 +213,7 @@ do
         # Generate Cutting masks for DTTT (ipsilateral)
         ## For dPSN : Remaining_CP to VPM
         scil_volume_math union ${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz \
-            ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz \
+            ${output_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz \
             ${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_dPSN_Cuts_mni.nii.gz \
             --data_type uint8 -f
         scil_labels_from_mask ${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_dPSN_Cuts_mni.nii.gz \
@@ -251,7 +251,7 @@ do
 
         #For vPSN : Remaining_CP to VPM
         scil_volume_math union ${mni_rois_dir}/${nsub}_${contra_nside}_VPM_mni.nii.gz \
-            ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz \
+            ${output_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz \
             ${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_mni.nii.gz \
             --data_type uint8 -f
         scil_labels_from_mask ${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_mni.nii.gz \ 
@@ -343,14 +343,14 @@ do
 			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_2.bdo 'any' 'exclude'\
 			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_3.bdo 'any' 'exclude'\
 			-f
-			
+
         ## dPSN
         ## VPM/Thalamus
         scil_tractogram_filter_by_roi \
             ${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv1000.trk \
             ${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_dPSN.trk \
             --drawn_roi ${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz 'any' 'include' \
-            --drawn_roi ${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz 'either_end' 'include'\
+            --drawn_roi ${output_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz 'either_end' 'include'\
 			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_1.bdo 'any' 'exclude'\
 			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_2.bdo 'any' 'exclude'\
 			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_3.bdo 'any' 'exclude'\
@@ -360,8 +360,8 @@ do
 			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_7.bdo 'any' 'exclude'\
 			--bdo ${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_8.bdo 'any' 'exclude'\
 			-f
-			
-			
+
+
     done
     echo "|------------- 3) Done -------------|"
     echo ""
