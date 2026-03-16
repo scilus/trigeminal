@@ -143,8 +143,8 @@ do
         ${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz \
         ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz \
         ${orig_tracking_dir}/orig/${nsub}_${nside}_from_spinal_track_npv1000.trk \
-        --npv ${npv_from_spinal_track_long} \ 
-        -v -f ${gpu}
+        --npv ${npv_from_spinal_track_long} \
+        ${gpu} -v -f
 
     # Tracking from Spinal bundle - npv 100
     echo "|------------- 1.4b) Tracking from Spinal bundle - npv ${npv_from_spinal_track_short}  -------------|"
@@ -154,7 +154,7 @@ do
         ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz \
         ${orig_tracking_dir}/orig/${nsub}_${nside}_from_spinal_track_npv100.trk \
         --npv ${npv_from_spinal_track_short} \
-        -v -f ${gpu}
+        ${gpu} -v -f
 
     # Tracking from Thalamus
     echo "|------------- 1.4c) Tracking from Thalamus - npv ${npv_from_thalamus_track}  -------------|"
@@ -164,7 +164,7 @@ do
         ${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz\
         ${orig_tracking_dir}/orig/${nsub}_${nside}_from_thalamus_npv500.trk \
         --npv ${npv_from_thalamus_track} \
-        -v -f ${gpu}
+        ${gpu} -v -f
 done
 
 echo "|------------- 1.5) Register Tracking in MNI space -------------|"
