@@ -194,10 +194,11 @@ for nside in left right
 do
     cp ${mni_dir}/MNI/Distal/${nside}/VPM.nii.gz \
         ${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz
-    for nroi in ${mni_dir}/MNI/from_${nside}/*;
+
+    for nroi in ${mni_dir}/MNI/from_${nside}/*gz;
     do
         ROI_basename=$(basename $nroi)
-        cp $nroi ${mni_rois_dir}/${nsub}_second_order_${ROI_basename/nii/_mni.nii}
+        cp $nroi ${mni_rois_dir}/${nsub}_second_order_${ROI_basename/.nii/_mni.nii}
     done
 done
 
@@ -254,7 +255,7 @@ do
         ${output_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz \
         ${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_mni.nii.gz \
         --data_type uint8 -f
-    scil_labels_from_mask ${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_mni.nii.gz \ 
+    scil_labels_from_mask ${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_mni.nii.gz \
         ${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_labels_mni.nii.gz \
         -f
 done
