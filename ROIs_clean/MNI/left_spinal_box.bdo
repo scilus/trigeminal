@@ -1,0 +1,9 @@
+<?xml version="1.0" ?>
+<mitkBoundingObject type="Cuboid">
+    <origin x="5.526397" y="29.900560" z="-47.555739" />
+    <WorldTransformMatrix>
+        <Row col1="3.540339" col2="0.000000" col3="0.000000" />
+        <Row col1="0.000000" col2="3.815834" col3="0.000000" />
+        <Row col1="0.000000" col2="0.000000" col3="3.660886" />
+    </WorldTransformMatrix>
+</mitkBoundingObject>

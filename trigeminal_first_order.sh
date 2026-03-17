@@ -6,6 +6,7 @@
 # grid of (step size, theta) combinations, merged, transformed to MNI space, filtered and segmented 
 # into three components (mesencephalic, spinal, remaining nucleus). Final cleaned bundles are saved
 # in both original (orig_space) and MNI (mni_space) coordinate spaces.
+# FA = 0.2 is used for HCP data; for clinical data, a lower FA threshold (e.g., 0.15) should be considered due to reduced anisotropy.
 
 # EXAMPLE COMMAND
 #
@@ -16,7 +17,7 @@
 #       -t 10 \
 #       -p 0.5 \
 #       -e 30 \
-#       -f 0.15 \
+#       -f 0.15 \     
 #       -n 20000 \
 #       -g true
 #
@@ -147,8 +148,10 @@ antsRegistrationSyN.sh \
     -f "${subject_dir}/tractoflow/${nsub}__t1_warped.nii.gz" \
     -m "${mni_dir}/MNI/mni_masked.nii.gz" \
     -t s \
-    -o "${output_dir}/${nsub}/orig_space/transfo/2orig_"
+    -o "${output_dir}/${nsub}/orig_space/transfo/2orig_" \
     > "${output_dir}/${nsub}/log.txt" 2>&1
+    
+
 
 ## [ORIG-SPACE] Register all ROIs
 for nroi in cp_left cp_right; do
@@ -345,7 +348,9 @@ for nside in left right; do
        --drawn_roi "${mni_rois_dir}/${nsub}_any_exclusion_roi_mni.nii.gz" 'any' 'exclude' \
        --drawn_roi "${mni_rois_dir}/${nsub}_${opp_side}_cerebellum_wm_mni.nii.gz" 'any' 'exclude' \
        --drawn_roi "${mni_rois_dir}/${nsub}_${nside}_cerebellum_wm_mni.nii.gz" 'either_end' 'exclude' \
-       --drawn_roi "${mni_dir}/MNI/midsagittal_plane.nii.gz" 'any' 'exclude' -f
+       --drawn_roi "${mni_dir}/MNI/midsagittal_plane.nii.gz" 'any' 'exclude' \
+       --no_empty \
+       -f
    else
      echo "WARN: ${in_trk} not found, skipping filtering for ${nside}"
    fi 
@@ -357,191 +362,179 @@ done
 # Remove intermediate MNI-space "orig" tractograms to avoid duplication on disk
 rm -rf "${merged_mni_dir}/orig"
 
+
+
+new_coronal="${mni_dir}/MNI/new_coronal.nii.gz"
+new_lower="${mni_dir}/MNI/new_lower.nii.gz"
+
+
+
 # =========================
 #  SEGMENT ONLY FINAL FILTERED FILE
 # =========================
 
 echo "|------------- 7) [MNI-SPACE] Segmentation -------------|"
-for nside in left right; do 
+for nside in left right; do
     fin="${merged_mni_dir}/filtered/${nsub}_${nside}_from_cp_filtered.trk"
 
+    # choose thalamus ROI to exclude based on side
+    if [[ "${nside}" == "left" ]]; then
+        thal_roi="${mni_dir}/MNI/left_thalamus_231_245_brainnetome__to_mni_masked.nii.gz"
+    else
+        thal_roi="${mni_dir}/MNI/right_thalamus_232_246_brainnetome__to_mni_masked.nii.gz"
+    fi
+
     ## Mesencephalic Tract (Top)
-     scil_tractogram_filter_by_roi "${fin}" \
-       "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_mesencephalic.trk"  \
-       --drawn_roi ${mni_dir}/MNI/upper_cut_brainstem.nii.gz 'any' 'include' \
-       --drawn_roi ${mni_dir}/MNI/coronal_plane.nii.gz 'any' 'include' \
-       --drawn_roi ${mni_dir}/MNI/coronal_plane_for_mesencephalic.nii.gz 'any' 'include' -f
+    scil_tractogram_filter_by_roi "${fin}" \
+      "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_mesencephalic.trk"  \
+      --drawn_roi "${mni_dir}/MNI/upper_cut_brainstem.nii.gz" 'any' 'include' \
+      --drawn_roi "${new_coronal}" 'any' 'include' \
+      --drawn_roi "${mni_dir}/MNI/coronal_plane_for_mesencephalic.nii.gz" 'any' 'include' \
+      --drawn_roi "${mni_dir}/MNI/csf_mask.nii.gz" 'any' 'exclude' \
+      --drawn_roi "${thal_roi}" 'any' 'exclude' \
+      --no_empty \
+      -f
+
+    ## Spinal Tracts (botton)
+
+    if [[ "${nside}" == "left" ]]; then
+    cp_roi="${mni_dir}/MNI/cp_left_bin.nii.gz"
+    deviated_br="${mni_dir}/MNI/left_spinal_deviation.nii.gz"
+    
+    else
+    cp_roi="${mni_dir}/MNI/cp_right_bin.nii.gz"
+    deviated_br="${mni_dir}/MNI/right_spinal_deviation.nii.gz"
+    fi
 
 
-    ## Spinal Tract (bottom)
+
     scil_tractogram_filter_by_roi "${fin}" \
       "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_spinal.trk" \
-      --drawn_roi ${mni_dir}/MNI/lowest_cut_brainstem.nii.gz 'any' 'include' \
-      --drawn_roi ${mni_dir}/MNI/coronal_plane.nii.gz 'any' 'include' -f
+      --drawn_roi  "${new_lower}" 'any' 'include' \
+      --drawn_roi  "${new_coronal}" 'any' 'include' \
+      --drawn_roi  "${mni_dir}/MNI/csf_mask.nii.gz" 'any' 'exclude' \
+      --drawn_roi  "${cp_roi}" 'either_end' 'include' \
+      --drawn_roi   "${deviated_br}" 'any' 'exclude' \
+      --no_empty \
+      -f
+
+
 
     ## Two remaining nucleus/tract
     scil_tractogram_filter_by_roi "${fin}" \
       "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_remaining_cp.trk" \
-      --drawn_roi ${mni_dir}/MNI/lower_cut_brainstem.nii.gz 'any' 'exclude' \
+      --drawn_roi "${new_lower}" 'any' 'exclude' \
       --drawn_roi ${mni_dir}/MNI/upper_cut_brainstem.nii.gz 'any' 'exclude' \
-      --drawn_roi ${mni_dir}/MNI/coronal_plane.nii.gz 'any' 'include' \
-      --bdo ${mni_dir}/MNI/sphere_exclusion_for_remaining_cp.bdo 'any' 'exclude' -f
+      --drawn_roi "${new_coronal}" 'any' 'include' \
+      --bdo ${mni_dir}/MNI/sphere_exclusion_for_remaining_cp.bdo 'any' 'exclude' \
+      --no_empty \
+      -f
 done
+
+
 
 echo "|------------- 7) Done -------------|"
 echo ""
 
+
+
 # =========================
 #  CLEANING FINAL BUNDLES
 # =========================
+
+
+
 
 echo "|------------- 8) Cleaning ---------|"
 
 
 for nside in left right; do
     # ----- 8.1 Mesencephalic -----
+
+    # Length-filter  the left and right mesencephalic bundle: 35< length < 70 mm now 35-70
+    
+    scil_tractogram_filter_by_length \
+        "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_mesencephalic.trk" \
+        "${merged_mni_dir}/segmented/length/${nsub}_${nside}_mesencephalic_len35_70.trk" \
+        --minL 35 --maxL 70 --display_counts -f
+
+
+
+    cp -f \
+        "${merged_mni_dir}/segmented/length/${nsub}_${nside}_mesencephalic_len35_70.trk" \
+        "${merged_mni_dir}/final/${nsub}_${nside}_mesencephalic.trk"
+    
+    # outlier-rejection
     scil_bundle_reject_outliers \
-      "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_mesencephalic.trk" \
+      "${merged_mni_dir}/segmented/length/${nsub}_${nside}_mesencephalic_len35_70.trk" \
       "${merged_mni_dir}/segmented/outliers/${nsub}_${nside}_mesencephalic.trk" \
-      -f
+     -f
+      
 
     cp "${merged_mni_dir}/segmented/outliers/${nsub}_${nside}_mesencephalic.trk" \
        "${merged_mni_dir}/final/${nsub}_${nside}_mesencephalic.trk"
 
-    
-    # ROI-based cleanup in MNI space, left mesencephalic ---   sphere01_left_mc.bdo
-    if [[ "${nside}" == "left" ]]; then
-    scil_tractogram_filter_by_roi \
-        "${merged_mni_dir}/final/${nsub}_${nside}_mesencephalic.trk" \
-        "${merged_mni_dir}/final/${nsub}_${nside}_mesencephalic.trk" \
-        --bdo "${mni_dir}/MNI/sphere01_left_mc.bdo" 'any' 'exclude' \
-        --bdo "${mni_dir}/MNI/sphere02_left_mc.bdo" 'any' 'exclude' \
-        --bdo "${mni_dir}/MNI/cube01_left_mc.bdo" 'any' 'exclude' -f
-    fi
-
-    # Length-filter  the left and right mesencephalic bundle: 10< length < 53 mm
-    
-    scil_tractogram_filter_by_length \
-        "${merged_mni_dir}/final/${nsub}_${nside}_mesencephalic.trk" \
-        "${merged_mni_dir}/segmented/length/${nsub}_${nside}_mesencephalic_len10_53.trk" \
-        --minL 10 --maxL 67 --display_counts -f
-
-    cp -f \
-        "${merged_mni_dir}/segmented/length/${nsub}_${nside}_mesencephalic_len10_53.trk" \
-        "${merged_mni_dir}/final/${nsub}_${nside}_mesencephalic.trk"
-    
-
-
 
     # ----- 8.2 spinal -----
+    
+    # Length-filter the left and right spinal bundle: 10< length < 55 mm
+    scil_tractogram_filter_by_length \
+         "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_spinal.trk" \
+        "${merged_mni_dir}/segmented/length/${nsub}_${nside}_spinal_len10_55.trk" \
+        --minL 10 --maxL 55 --display_counts -f
+
+
+    cp -f \
+        "${merged_mni_dir}/segmented/length/${nsub}_${nside}_spinal_len10_55.trk" \
+        "${merged_mni_dir}/final/${nsub}_${nside}_spinal.trk"
+    
+
+    # outlier-rejection
     scil_bundle_reject_outliers \
-      "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_spinal.trk" \
+      "${merged_mni_dir}/segmented/length/${nsub}_${nside}_spinal_len10_55.trk" \
       "${merged_mni_dir}/segmented/outliers/${nsub}_${nside}_spinal.trk" \
       -f
 
     cp "${merged_mni_dir}/segmented/outliers/${nsub}_${nside}_spinal.trk" \
        "${merged_mni_dir}/final/${nsub}_${nside}_spinal.trk"
 
-
-
-    # ROI-based cleanup in MNI space, left spinal ---   
-    if [[ "${nside}" == "left" ]]; then
-        # new cleanup ROI for LEFT spinal
-        scil_tractogram_filter_by_roi \
-        "${merged_mni_dir}/final/${nsub}_${nside}_spinal.trk" \
-        "${merged_mni_dir}/final/${nsub}_${nside}_spinal.trk" \
-        --bdo ${mni_dir}/MNI/cube01_left_spinal.bdo 'any' 'exclude' \
-        --bdo ${mni_dir}/MNI/cube02_left_spinal.bdo 'any' 'exclude' \
-        --bdo ${mni_dir}/MNI/cube03_left_spinal.bdo 'any' 'exclude' \
-        --bdo ${mni_dir}/MNI/cube04_left_spinal.bdo 'any' 'exclude' \
-        --bdo ${mni_dir}/MNI/cube05_left_spinal.bdo 'any' 'exclude' \
-        --bdo ${mni_dir}/MNI/sphere01_left_spinal.bdo 'any' 'exclude' -f
-
-    fi
-
-
-    # ROI-based cleanup in MNI space, right spinal ---  
-    if [[ "${nside}" == "right" ]]; then
-        scil_tractogram_filter_by_roi \
-        "${merged_mni_dir}/final/${nsub}_${nside}_spinal.trk" \
-        "${merged_mni_dir}/final/${nsub}_${nside}_spinal.trk" \
-        --bdo "${mni_dir}/MNI/cube01_right_spinal.bdo" 'any' 'exclude' \
-        --bdo "${mni_dir}/MNI/cube02_right_spinal.bdo" 'any' 'exclude' \
-        --bdo "${mni_dir}/MNI/cube03_right_spinal.bdo" 'any' 'exclude' -f
-    fi
-
-    # Length-filter the left and right spinal bundle: 10< length < 61 mm
+     
+    # ----- 8.3 remaining cp -----
+    
+    # Length-filter the left and right remaining_cp bundle: 8< length < 37 mm
+    
     scil_tractogram_filter_by_length \
-        "${merged_mni_dir}/final/${nsub}_${nside}_spinal.trk" \
-        "${merged_mni_dir}/segmented/length/${nsub}_${nside}_spinal_len10_61.trk" \
-        --minL 10 --maxL 61 --display_counts -f
+        "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_remaining_cp.trk" \
+        "${merged_mni_dir}/segmented/length/${nsub}_${nside}_remaining_cp_len8_37.trk" \
+        --minL 8 --maxL 37 --display_counts -f
 
 
     cp -f \
-        "${merged_mni_dir}/segmented/length/${nsub}_${nside}_spinal_len10_61.trk" \
-        "${merged_mni_dir}/final/${nsub}_${nside}_spinal.trk"
+        "${merged_mni_dir}/segmented/length/${nsub}_${nside}_remaining_cp_len8_37.trk" \
+        "${merged_mni_dir}/final/${nsub}_${nside}_remaining_cp.trk"
     
-
-     
-    # ----- 8.3 remaining cp -----
+    
+    # outlier-rejection
     scil_bundle_reject_outliers \
-       "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_remaining_cp.trk" \
+      "${merged_mni_dir}/segmented/length/${nsub}_${nside}_remaining_cp_len8_37.trk" \
        "${merged_mni_dir}/segmented/outliers/${nsub}_${nside}_remaining_cp.trk" \
        --alpha 0.97 -f
 
-    cp_final="${merged_mni_dir}/final/${nsub}_${nside}_remaining_cp.trk"
-    cp "${merged_mni_dir}/segmented/outliers/${nsub}_${nside}_remaining_cp.trk" "${cp_final}"  
-
-    
-
-    if [[ -f "${cp_final}" ]]; then
-        scil_tractogram_filter_by_orientation \
-          "${cp_final}" \
-          "${cp_final}" \
-          --max_z 7 --use_abs -f
-    else
-        echo "WARN: ${cp_final} does not exist, skipping orientation filtering for ${nside}"
-    fi
-
-
-
-    # ROI-based cleanup in MNI space, left remaining_cp ---    
-    if [[ "${nside}" == "left" ]]; then
-        # new cleanup ROI for left remaining_cp
-        scil_tractogram_filter_by_roi \
-        "${merged_mni_dir}/final/${nsub}_${nside}_remaining_cp.trk" \
-        "${merged_mni_dir}/final/${nsub}_${nside}_remaining_cp.trk" \
-        --bdo ${mni_dir}/MNI/cube01_left_rcp.bdo 'any' 'exclude' \
-        --bdo ${mni_dir}/MNI/cube02_left_rcp.bdo 'any' 'exclude' \
-        --bdo ${mni_dir}/MNI/cube03_left_rcp.bdo 'any' 'exclude'  -f
-    fi
-
-
-     # ROI-based cleanup in MNI space,  right remaining_cp ---   
-    if [[ "${nside}" == "right" ]]; then
-        # new cleanup ROI for rightremaining_cp
-        scil_tractogram_filter_by_roi \
-        "${merged_mni_dir}/final/${nsub}_${nside}_remaining_cp.trk" \
-        "${merged_mni_dir}/final/${nsub}_${nside}_remaining_cp.trk" \
-        --bdo ${mni_dir}/MNI/cube01_right_rcp.bdo 'any' 'exclude'  \
-        --bdo ${mni_dir}/MNI/cube02_right_rcp.bdo 'any' 'exclude'  -f
-    fi
-
-
-
-    # Length-filter the left and right remaining_cp bundle: 8< length < 32 mm
-    
-    scil_tractogram_filter_by_length \
-        "${merged_mni_dir}/final/${nsub}_${nside}_remaining_cp.trk" \
-        "${merged_mni_dir}/segmented/length/${nsub}_${nside}_remaining_cp_len8_32.trk" \
-        --minL 8 --maxL 32 --display_counts -f
-
-
     cp -f \
-        "${merged_mni_dir}/segmented/length/${nsub}_${nside}_remaining_cp_len8_32.trk" \
+        "${merged_mni_dir}/segmented/outliers/${nsub}_${nside}_remaining_cp.trk" \
         "${merged_mni_dir}/final/${nsub}_${nside}_remaining_cp.trk"
+
     
 
+    # Orientation filter last
+    scil_tractogram_filter_by_orientation \
+        "${merged_mni_dir}/final/${nsub}_${nside}_remaining_cp.trk" \
+        "${merged_mni_dir}/final/${nsub}_${nside}_remaining_cp.trk" \
+        --max_z 7 --use_abs -f
+
+
+
+    
 done
 
     echo "|------------- 8) Done  -------------|"
@@ -584,3 +577,4 @@ done
 
 echo "|------------- 9) Done -------------|"
 echo ""
+
