@@ -2,18 +2,35 @@
 # TRIGEMINAL SYSTEM TRACTOGRAPHY - Samir Akeb (2022-2023)
 # TRIGEMINAL SYSTEM TRACTOGRAPHY - Arnaud Bore (2023-2024)
 
+# This script performs tractography of the second order trigeminal system based on the output of 
+# the first-order tractography pipeline (trigeminal_first_order.sh).
+# You should be running the exact command you ran for the first order (same input/output).
+
+
+# EXAMPLE COMMAND
+#
+#   bash trigeminal_second_order.sh \
+#       -s /path/to/subject/folder/sub-01 \
+#       -m /path/to/ROIs_mean \
+#       -o /path/to/output_dir \
+#       -t 10 \
+#       -g true
+#
+# Notes:
+#   - GPU option (-g) accelerates local tracking when supported; omit it to run on CPU.
+
 # Input structure
 #
 #    [input]
 #    ├── sub-01
 #    │   ├── freesurfer
 #    │   │   └─── aparc.DKTatlas+aseg.mgz
-#    │   ├── sub-01__fa.nii.gz
-#    │   ├── sub-01__fodf.nii.gz
-#    │   └── sub-01__t1_warped.nii.gz
+#    │   └── tractoflow
+#    │       ├── sub-01__fa.nii.gz
+#    │       ├── sub-01__fodf.nii.gz
+#    │       └── sub-01__t1_warped.nii.gz
 #    │
 #    ├── S2
-#    .
 #    .
 
 usage() { echo "$(basename $0) [-s path/to/subject] [-m path/to/mni] [-o output_dir] [-t nb_threads] [-g] (if you have a gpu)" 1>&2; exit 1; }
