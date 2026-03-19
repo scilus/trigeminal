@@ -1,8 +1,4 @@
 #!/bin/bash
-# TRIGEMINAL SYSTEM TRACTOGRAPHY - Samir Akeb (2022-2023)
-# TRIGEMINAL SYSTEM TRACTOGRAPHY - Arnaud Bore (2023-2024)
-
-
 
 # This script performs ensemble tractography of the trigeminal system using fODFs and FA maps
 # from TractoFlow. Anatomical ROIs from both FreeSurfer and the ROIs_mean MNI folder are used to
@@ -10,7 +6,7 @@
 # grid of (step size, theta) combinations, merged, transformed to MNI space, filtered and segmented 
 # into three components (mesencephalic, spinal, remaining nucleus). Final cleaned bundles are saved
 # in both original (orig_space) and MNI (mni_space) coordinate spaces.
-#FA = 0.2 is used for HCP data; for clinical data, a lower FA threshold (e.g., 0.15) should be considered due to reduced anisotropy.
+# FA = 0.2 is used for HCP data; for clinical data, a lower FA threshold (e.g., 0.15) should be considered due to reduced anisotropy.
 
 # EXAMPLE COMMAND
 #
@@ -31,22 +27,19 @@
 #       theta = {20, 30, 40}
 #   - GPU option (-g) accelerates local tracking when supported; omit it to run on CPU.
 
-
-
 # Input structure
 #
 #    [input]
 #    ├── sub-01
 #    │   ├── freesurfer
 #    │   │   └─── aparc.DKTatlas+aseg.mgz
-#    │   ├── sub-01__fa.nii.gz
-#    │   ├── sub-01__fodf.nii.gz
-#    │   └── sub-01__t1_warped.nii.gz
+#    │   └── tractoflow
+#    │       ├── sub-01__fa.nii.gz
+#    │       ├── sub-01__fodf.nii.gz
+#    │       └── sub-01__t1_warped.nii.gz
 #    │
 #    ├── S2
 #    .
-#    .
-
 
 # -m : Path to the MNI-space reference folder.
 #       In this project, it should point to the path/to/trigeminal/ROIs_clean/ folder
