@@ -5,51 +5,20 @@ set -euo pipefail
 # TRIGEMINAL SYSTEM TRACTOGRAPHY - Arnaud Bore (2023-2024)
 # TRIGEMINAL SYSTEM TRACTOGRAPHY - Nasrin Rafiei (2025-2026)
 #
-# SECOND-ORDER ENSEMBLE VERSION (organized like first-order)
-#
-# This version adds ensemble tracking to the second-order tracking stage
-# using the same style as first-order:
-#   step_list=(0.1 0.5 1.0)
-#   theta_list=(20 30 40)
+# SECOND-ORDER ENSEMBLE VERSION
+# Compatible with the newer original second-order ROI/BDO logic
+# while keeping the organized ensemble structure.
 #
 # Organized pipeline:
-#   1) pool first-order final spinal / remaining_cp bundles
-#   2) prepare second-order seed masks and thalamus ROIs
-#   3) run second-order tracking for each (step, theta) combo in ORIG
-#   4) merge combo outputs per tracking role in ORIG
-#   5) register merged tractograms once to MNI
-#   6) prepare second-order MNI ROIs and cut masks
-#   7) filter merged second-order tractograms into pathway bundles
-#   8) cut filtered bundles with label masks
-#   9) reject outliers and save final second-order bundles
-#
-# INPUT:
-#   subject folder(s) containing:
-#     <sub>/freesurfer/aparc.DKTatlas+aseg.mgz
-#     <sub>/tractoflow/<sub>__fa.nii.gz
-#     <sub>/tractoflow/<sub>__fodf.nii.gz
-#     <sub>/tractoflow/<sub>__t1_warped.nii.gz
-#
-# EXPECTED FIRST-ORDER OUTPUTS:
-#   <out_dir>/<sub>/mni_space/tracking_first_order/final_merged/final/<sub>_<side>_spinal.trk
-#   <out_dir>/<sub>/mni_space/tracking_first_order/final_merged/final/<sub>_<side>_remaining_cp.trk
-#
-# USAGE EXAMPLE:
-#   bash trigeminal_second_order.sh \
-#       -s /path/to/data/sub-01 \
-#       -m /path/to/ROIs_clean \
-#       -o /path/to/first_order_output_root \
-#       -f 0.15 \
-#       -t 10 \
-#       -g true
-#
-# OPTIONAL:
-#   -p step_size   if used with -e, run single combo only
-#   -e theta_deg   if used with -p, run single combo only
-#
-# DEFAULT ensemble if -p/-e are not both given:
-#   step  = 0.1 0.5 1.0
-#   theta = 20 30 40
+#   0) pool first-order final spinal / remaining_cp bundles
+#   1) prepare second-order seed masks and thalamus ROIs
+#   2) run second-order tracking for each (step, theta) combo in ORIG
+#   3) merge combo outputs per tracking role in ORIG
+#   4) register merged tractograms once to MNI
+#   5) prepare second-order MNI ROIs and cut masks
+#   6) filter merged second-order tractograms into pathway bundles
+#   7) cut filtered bundles with label masks
+#   8) reject outliers and save final second-order bundles
 
 usage() {
     cat <<EOF 1>&2
@@ -70,13 +39,6 @@ Second-order seed budgets (TOTAL per role; auto-split across combos):
   --npv_spinal_long N   default: 1000
   --npv_spinal_short N  default: 100
   --npv_thalamus N      default: 500
-
-Notes:
-  - First-order final expected at: <out_dir>/*/mni_space/tracking_first_order/final_merged/final/
-  - This script expects first-order transfo in:
-      <out_dir>/<sub>/orig_space/transfo/2orig_0GenericAffine.mat
-      <out_dir>/<sub>/orig_space/transfo/2orig_1Warp.nii.gz
-      <out_dir>/<sub>/orig_space/transfo/2orig_1InverseWarp.nii.gz
 EOF
     exit 1
 }
@@ -362,7 +324,7 @@ for nsub_path in "${subject_list[@]}"; do
             echo "|=== Second-order combo: ${combo_tag} ===|"
 
             for nside in left right; do
-                # spinal long
+                # Tracking from Spinal bundle - long
                 scil_tracking_local \
                     "${nsub_path}/tractoflow/${nsub}__fodf.nii.gz" \
                     "${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz" \
@@ -373,7 +335,7 @@ for nsub_path in "${subject_list[@]}"; do
                     --theta "${theta}" \
                     ${gpu} -v -f
 
-                # spinal short
+                # Tracking from Spinal bundle - short
                 scil_tracking_local \
                     "${nsub_path}/tractoflow/${nsub}__fodf.nii.gz" \
                     "${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz" \
@@ -384,7 +346,7 @@ for nsub_path in "${subject_list[@]}"; do
                     --theta "${theta}" \
                     ${gpu} -v -f
 
-                # thalamus
+                # Tracking from Thalamus
                 scil_tracking_local \
                     "${nsub_path}/tractoflow/${nsub}__fodf.nii.gz" \
                     "${orig_rois_dir}/${nsub}_${nside}_thalamus_orig.nii.gz" \
@@ -471,6 +433,7 @@ for nsub_path in "${subject_list[@]}"; do
             contra_nside="left"
         fi
 
+        # DTTT ipsilateral dPSN : remaining_cp to VPM
         scil_volume_math union \
             "${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz" \
             "${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz" \
@@ -481,6 +444,7 @@ for nsub_path in "${subject_list[@]}"; do
             "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_dPSN_Cuts_labels_mni.nii.gz" \
             -f
 
+        # DTTT ipsilateral CS : spinal to VPM
         scil_volume_math union \
             "${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" \
@@ -491,6 +455,7 @@ for nsub_path in "${subject_list[@]}"; do
             "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_CS_Cuts_labels_mni.nii.gz" \
             -f
 
+        # DTTT contralateral CS : spinal to thalamus
         scil_volume_math union \
             "${mni_rois_dir}/${nsub}_${contra_nside}_thalamus_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" \
@@ -501,6 +466,7 @@ for nsub_path in "${subject_list[@]}"; do
             "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Controlat_CS_Cuts_labels_mni.nii.gz" \
             -f
 
+        # VTTT contralateral OS and IS : spinal to thalamus
         scil_volume_math union \
             "${mni_rois_dir}/${nsub}_${contra_nside}_thalamus_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" \
@@ -511,6 +477,7 @@ for nsub_path in "${subject_list[@]}"; do
             "${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_OSandIS_Cuts_labels_mni.nii.gz" \
             -f
 
+        # VTTT contralateral vPSN : remaining_cp to VPM
         scil_volume_math union \
             "${mni_rois_dir}/${nsub}_${contra_nside}_VPM_mni.nii.gz" \
             "${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz" \
@@ -535,6 +502,7 @@ for nsub_path in "${subject_list[@]}"; do
 
         echo "|------------- 6.1) From ${nside} - VTTT (contralateral) - OS/IS and vPSN -------------|"
 
+        # OS and IS
         scil_tractogram_filter_by_roi \
             "${mni_tracking_dir_second_order}/orig/${nsub}_${contra_nside}_from_thalamus_npv500.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_VTTT_Controlat_OSandIS.trk" \
@@ -547,8 +515,13 @@ for nsub_path in "${subject_list[@]}"; do
             --drawn_roi "${mni_dir}/MNI/from_${nside}/VTTT_Controlat_EXC_CaudalMedulla_Controlat.nii.gz" 'any' 'exclude' \
             --drawn_roi "${mni_dir}/MNI/from_${nside}/VTTT_Controlat_INC_VTT_Area.nii.gz" 'any' 'include' \
             --drawn_roi "${mni_dir}/MNI/from_${nside}/VTTT_Controlat_EXC_Pons_Ipsilat.nii.gz" 'any' 'exclude' \
-            --drawn_roi "${mni_dir}/MNI/cs_plaque.nii.gz" 'any' 'exclude' -f
+            --drawn_roi "${mni_dir}/MNI/cs_plaque.nii.gz" 'any' 'exclude' \
+            --drawn_roi "${mni_dir}/MNI/from_${nside}/VTTT_Controlat_INC_VTT_Area.nii.gz" 'any' 'include' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/VTTT_Controlat_OSandIS_1.bdo" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/VTTT_Controlat_OSandIS_2.bdo" 'any' 'exclude' \
+            -f
 
+        # vPSN
         scil_tractogram_filter_by_roi \
             "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv1000.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_VTTT_Controlat_vPSN.trk" \
@@ -564,7 +537,8 @@ for nsub_path in "${subject_list[@]}"; do
             --bdo "${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_3.bdo" 'any' 'exclude' \
             --bdo "${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_4.bdo" 'any' 'exclude' \
             --bdo "${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_5.bdo" 'any' 'exclude' \
-            --bdo "${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_6.bdo" 'any' 'exclude' -f
+            --bdo "${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_6.bdo" 'any' 'exclude' \
+            -f
 
         echo "|------------- 6.2) ${nside} - DTTT (contralateral) - CS -------------|"
         scil_tractogram_filter_by_roi \
@@ -575,22 +549,43 @@ for nsub_path in "${subject_list[@]}"; do
             --drawn_roi "${mni_dir}/MNI/from_${contra_nside}/VTTT_Controlat_EXC_Ventral_Brainstem.nii.gz" 'any' 'exclude' \
             --drawn_roi "${mni_dir}/MNI/from_${contra_nside}/DTTT_Controlat_INC_CaudalMedulla_Ipsilat.nii.gz" 'any' 'include' \
             --drawn_roi "${mni_dir}/MNI/from_${contra_nside}/DTTT_Controlat_INC_Medulla_Controlat.nii.gz" 'any' 'include' \
-            --drawn_roi "${mni_dir}/MNI/from_${contra_nside}/DTTT_Controlat_EXC_Midbrain_Ipsilat.nii.gz" 'any' 'exclude' -f
+            --drawn_roi "${mni_dir}/MNI/from_${contra_nside}/DTTT_Controlat_EXC_Midbrain_Ipsilat.nii.gz" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_1.bdo" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_2.bdo" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_3.bdo" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_4.bdo" 'any' 'exclude' \
+            -f
 
         echo "|------------- 6.3) ${nside} - DTTT (ipsilateral) - dPSN and CS -------------|"
+
+        # CS
         scil_tractogram_filter_by_roi \
             "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv100.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_CS.trk" \
             --drawn_roi "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" 'either_end' 'include' \
             --drawn_roi "${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz" 'any' 'include' \
             --drawn_roi "${mni_dir}/MNI/from_${nside}/VTTT_Controlat_EXC_Ventral_Brainstem.nii.gz" 'any' 'exclude' \
-            --drawn_roi "${mni_dir}/MNI/midsagittal_plane.nii.gz" 'any' 'exclude' -f
+            --drawn_roi "${mni_dir}/MNI/midsagittal_plane.nii.gz" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_1.bdo" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_2.bdo" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_3.bdo" 'any' 'exclude' \
+            -f
 
+        # dPSN
         scil_tractogram_filter_by_roi \
             "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv1000.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_dPSN.trk" \
             --drawn_roi "${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz" 'any' 'include' \
-            --drawn_roi "${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz" 'either_end' 'include' -f
+            --drawn_roi "${out_dir}/mni_space/tracking_first_order/final/all_${nside}_remaining_cp_density_mni.nii.gz" 'either_end' 'include' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_1.bdo" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_2.bdo" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_3.bdo" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_4.bdo" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_5.bdo" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_6.bdo" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_7.bdo" 'any' 'exclude' \
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_8.bdo" 'any' 'exclude' \
+            -f
     done
 
     # -------------------------
