@@ -213,7 +213,7 @@ for nsub_path in "${subject_list[@]}"; do
     mkdir -p "${out_dir}/${nsub}/orig_space/rois"
     mkdir -p "${out_dir}/${nsub}/orig_space/tracking_second_order"/{trials,merged,final}
     mkdir -p "${out_dir}/${nsub}/mni_space/rois"
-    mkdir -p "${out_dir}/${nsub}/mni_space/tracking_second_order"/{orig,filtered,segmented,final,cut}
+    mkdir -p "${out_dir}/${nsub}/mni_space/tracking_second_order"/{orig,filtered,final,cut}
 
     orig_rois_dir="${out_dir}/${nsub}/orig_space/rois"
     mni_rois_dir="${out_dir}/${nsub}/mni_space/rois"
@@ -639,4 +639,27 @@ for nsub_path in "${subject_list[@]}"; do
 
     echo "|------------- SECOND-ORDER ENSEMBLE FOR ${nsub} IS COMPLETED -------------|"
     echo ""
+done
+
+
+echo "|------------- 9) [BACK-TO-ORIG] Register final MNI bundles to orig space -------------|"
+
+for nside in left right; do
+    for nbundle in DTTT_Ipsilat_CS DTTT_Ipsilat_dPSN DTTT_Controlat_CS VTTT_Controlat_OSandIS VTTT_Controlat_vPSN; do
+        in_trk="${mni_tracking_dir_second_order}/final/${nsub}_from_${nside}_${nbundle}.trk"
+        out_trk="${orig_tracking_dir}/final/${nsub}_from_${nside}_${nbundle}_orig.trk"
+
+        if [[ -f "${in_trk}" ]]; then
+            scil_tractogram_apply_transform \
+                "${in_trk}" \
+                "${nsub_path}/tractoflow/${nsub}__t1_warped.nii.gz" \
+                "${out_dir}/${nsub}/orig_space/transfo/2orig_0GenericAffine.mat" \
+                "${out_trk}" \
+                --inverse \
+                --in_deformation "${out_dir}/${nsub}/orig_space/transfo/2orig_1InverseWarp.nii.gz" \
+                --remove_invalid -f
+        else
+            echo "WARN: Final MNI bundle not found for ${nside} ${nbundle}, skipping back-to-orig."
+        fi
+    done
 done
