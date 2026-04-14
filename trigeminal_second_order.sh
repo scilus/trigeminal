@@ -377,22 +377,7 @@ for nsub_path in "${subject_list[@]}"; do
                     "${orig_trials_root}/${combo_tag}/${nsub}_${nside}_from_thalamus_npv500_${combo_tag}.trk" \
                     --npv "${npv_thalamus_per_combo}" \
                     --step "${step_size}" \
-                    --theta "${theta}" \trk_is_empty() {
-    local f="$1"
-
-    if [[ ! -f "${f}" ]]; then
-        return 0
-    fi
-
-    local n_str
-    n_str=$(scil_tractogram_count_streamlines "${f}" 2>/dev/null | grep -Eo '[0-9]+' | tail -n 1 || true)
-
-    if [[ -z "${n_str}" || "${n_str}" -eq 0 ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
+                    --theta "${theta}" \
                     ${gpu} -v -f
             done
         done
