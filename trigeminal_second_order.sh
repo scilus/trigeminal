@@ -113,6 +113,29 @@ if [[ -n "${g}" ]]; then
     gpu="--use_gpu"
 fi
 
+
+
+trk_is_empty() {
+    local f="$1"
+
+    if [[ ! -f "${f}" ]]; then
+        return 0
+    fi
+
+    local n_str
+    n_str=$(scil_tractogram_count_streamlines "${f}" 2>/dev/null | grep -Eo '[0-9]+' | tail -n 1 || true)
+
+    if [[ -z "${n_str}" || "${n_str}" -eq 0 ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+
+
+
+
 # -------------------------
 # Ensemble grid
 # -------------------------
@@ -354,7 +377,22 @@ for nsub_path in "${subject_list[@]}"; do
                     "${orig_trials_root}/${combo_tag}/${nsub}_${nside}_from_thalamus_npv500_${combo_tag}.trk" \
                     --npv "${npv_thalamus_per_combo}" \
                     --step "${step_size}" \
-                    --theta "${theta}" \
+                    --theta "${theta}" \trk_is_empty() {
+    local f="$1"
+
+    if [[ ! -f "${f}" ]]; then
+        return 0
+    fi
+
+    local n_str
+    n_str=$(scil_tractogram_count_streamlines "${f}" 2>/dev/null | grep -Eo '[0-9]+' | tail -n 1 || true)
+
+    if [[ -z "${n_str}" || "${n_str}" -eq 0 ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
                     ${gpu} -v -f
             done
         done
@@ -588,36 +626,105 @@ for nsub_path in "${subject_list[@]}"; do
             -f
     done
 
-    # -------------------------
-    # 7) Cut filtered second-order bundles with label masks
-    # -------------------------
-    echo "|------------- 7) Cut filtered second-order bundles with label masks -------------|"
-    for nside in left right; do
+
+
+# -------------------------
+# 7) Cut filtered second-order bundles with label masks
+# -------------------------
+echo "|------------- 7) Cut filtered second-order bundles with label masks -------------|"
+for nside in left right; do
+
+    in_trk="${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_VTTT_Controlat_OSandIS.trk"
+    out_trk="${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_VTTT_Controlat_OSandIS.trk"
+    if trk_is_empty "${in_trk}"; then
+        echo "WARN: ${in_trk} is missing or empty, skipping cut."
+    else
         scil_tractogram_cut_streamlines \
-            "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_VTTT_Controlat_OSandIS.trk" \
+            "${in_trk}" \
             --labels "${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_OSandIS_Cuts_labels_mni.nii.gz" \
-            "${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_VTTT_Controlat_OSandIS.trk" -f
+            "${out_trk}" -f
 
+        if trk_is_empty "${out_trk}"; then
+            echo "WARN: ${out_trk} is empty after cut, removing."
+            rm -f "${out_trk}"
+        fi
+    fi
+
+    in_trk="${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_VTTT_Controlat_vPSN.trk"
+    out_trk="${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_VTTT_Controlat_vPSN.trk"
+    if trk_is_empty "${in_trk}"; then
+        echo "WARN: ${in_trk} is missing or empty, skipping cut."
+    else
         scil_tractogram_cut_streamlines \
-            "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_VTTT_Controlat_vPSN.trk" \
+            "${in_trk}" \
             --labels "${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_labels_mni.nii.gz" \
-            "${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_VTTT_Controlat_vPSN.trk" -f
+            "${out_trk}" -f
 
+        if trk_is_empty "${out_trk}"; then
+            echo "WARN: ${out_trk} is empty after cut, removing."
+            rm -f "${out_trk}"
+        fi
+    fi
+
+    in_trk="${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Controlat_CS.trk"
+    out_trk="${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_DTTT_Controlat_CS.trk"
+    if trk_is_empty "${in_trk}"; then
+        echo "WARN: ${in_trk} is missing or empty, skipping cut."
+    else
         scil_tractogram_cut_streamlines \
-            "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Controlat_CS.trk" \
+            "${in_trk}" \
             --labels "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Controlat_CS_Cuts_labels_mni.nii.gz" \
-            "${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_DTTT_Controlat_CS.trk" -f
+            "${out_trk}" -f
 
+        if trk_is_empty "${out_trk}"; then
+            echo "WARN: ${out_trk} is empty after cut, removing."
+            rm -f "${out_trk}"
+        fi
+    fi
+
+    in_trk="${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_CS.trk"
+    out_trk="${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_DTTT_Ipsilat_CS.trk"
+    if trk_is_empty "${in_trk}"; then
+        echo "WARN: ${in_trk} is missing or empty, skipping cut."
+    else
         scil_tractogram_cut_streamlines \
-            "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_CS.trk" \
+            "${in_trk}" \
             --labels "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_CS_Cuts_labels_mni.nii.gz" \
-            "${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_DTTT_Ipsilat_CS.trk" -f
+            "${out_trk}" -f
 
+        if trk_is_empty "${out_trk}"; then
+            echo "WARN: ${out_trk} is empty after cut, removing."
+            rm -f "${out_trk}"
+        fi
+    fi
+
+    in_trk="${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_dPSN.trk"
+    out_trk="${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_DTTT_Ipsilat_dPSN.trk"
+    if trk_is_empty "${in_trk}"; then
+        echo "WARN: ${in_trk} is missing or empty, skipping cut."
+    else
         scil_tractogram_cut_streamlines \
-            "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_dPSN.trk" \
+            "${in_trk}" \
             --labels "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_dPSN_Cuts_labels_mni.nii.gz" \
-            "${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_DTTT_Ipsilat_dPSN.trk" -f
-    done
+            "${out_trk}" -f
+
+        if trk_is_empty "${out_trk}"; then
+            echo "WARN: ${out_trk} is empty after cut, removing."
+            rm -f "${out_trk}"
+        fi
+    fi
+done
+
+
+
+
+
+
+
+
+
+
+
 
     # -------------------------
     # 8) Reject outliers and save final second-order bundles
