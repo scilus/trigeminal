@@ -6,17 +6,14 @@ set -euo pipefail
 # TRIGEMINAL SYSTEM TRACTOGRAPHY - Nasrin Rafiei (2025-2026)
 #
 # SECOND-ORDER ENSEMBLE VERSION
-# This script performs tractography of the second order trigeminal system based on the output of 
-# the first-order tractography pipeline (trigeminal_first_order.sh).
-# You should be running the exact command you ran for the first order (same input/output).
-#
 # SUBJECT-BY-SUBJECT VERSION:
 #   - no pooled all_left/all_right files
 #   - each subject uses its own first-order spinal / remaining_cp bundles
 #   - nothing is created outside the subject folder
+#   - subject-specific density maps are stored directly in mni_space/rois
 #
 # Organized pipeline:
-#   0) prepare subject-specific first-order density maps for second-order
+#   0) prepare subject-specific first-order density maps
 #   1) prepare second-order seed masks and thalamus ROIs
 #   2) run second-order tracking for each (step, theta) combo in ORIG
 #   3) merge combo outputs per tracking role in ORIG
@@ -193,14 +190,12 @@ for nsub_path in "${subject_list[@]}"; do
     mkdir -p "${out_dir}/${nsub}/orig_space/tracking_second_order"/{trials,merged,final}
     mkdir -p "${out_dir}/${nsub}/mni_space/rois"
     mkdir -p "${out_dir}/${nsub}/mni_space/tracking_second_order"/{orig,filtered,final,cut}
-    mkdir -p "${out_dir}/${nsub}/mni_space/tracking_first_order/final_subject_second_order"
 
     orig_rois_dir="${out_dir}/${nsub}/orig_space/rois"
     mni_rois_dir="${out_dir}/${nsub}/mni_space/rois"
     orig_tracking_dir="${out_dir}/${nsub}/orig_space/tracking_second_order"
     mni_tracking_dir_second_order="${out_dir}/${nsub}/mni_space/tracking_second_order"
     first_order_final_dir="${out_dir}/${nsub}/mni_space/tracking_first_order/final_merged/final"
-    subject_first_order_dir="${out_dir}/${nsub}/mni_space/tracking_first_order/final_subject_second_order"
 
     orig_trials_root="${orig_tracking_dir}/trials"
     orig_merged_root="${orig_tracking_dir}/merged"
@@ -256,17 +251,18 @@ for nsub_path in "${subject_list[@]}"; do
 
     # ============================================================
     # 0) Prepare subject-specific first-order density maps
+    #     Store directly in mni_space/rois
     # ============================================================
     echo "|------------- 0) Prepare subject-specific first-order density maps -------------|"
     for nside in left right; do
         scil_tractogram_compute_density_map \
             "${first_order_final_dir}/${nsub}_${nside}_spinal.trk" \
-            "${subject_first_order_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" \
+            "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" \
             --binary -f
 
         scil_tractogram_compute_density_map \
             "${first_order_final_dir}/${nsub}_${nside}_remaining_cp.trk" \
-            "${subject_first_order_dir}/${nsub}_${nside}_remaining_cp_density_mni.nii.gz" \
+            "${mni_rois_dir}/${nsub}_${nside}_remaining_cp_density_mni.nii.gz" \
             --binary -f
     done
 
@@ -275,14 +271,11 @@ for nsub_path in "${subject_list[@]}"; do
     # -------------------------
     echo "|------------- 1) Prepare second-order seed masks and thalamus ROIs -------------|"
 
-    echo "|------------- 1.1) Copy subject spinal seed masks and transform them to orig space -------------|"
+    echo "|------------- 1.1) Transform subject spinal seed masks to orig space -------------|"
     for nside in left right; do
-        cp "${subject_first_order_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" \
-           "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz"
-
         antsApplyTransforms \
             -d 3 \
-            -i "${subject_first_order_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" \
+            -i "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" \
             -r "${nsub_path}/tractoflow/${nsub}__t1_warped.nii.gz" \
             -t "${out_dir}/${nsub}/orig_space/transfo/2orig_1Warp.nii.gz" \
             -t "${out_dir}/${nsub}/orig_space/transfo/2orig_0GenericAffine.mat" \
@@ -378,6 +371,9 @@ for nsub_path in "${subject_list[@]}"; do
         done
     done
 
+
+
+
     # -------------------------
     # 4) Register merged second-order tractograms to MNI space
     # -------------------------
@@ -429,7 +425,7 @@ for nsub_path in "${subject_list[@]}"; do
 
         scil_volume_math union \
             "${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz" \
-            "${subject_first_order_dir}/${nsub}_${nside}_remaining_cp_density_mni.nii.gz" \
+            "${mni_rois_dir}/${nsub}_${nside}_remaining_cp_density_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_dPSN_Cuts_mni.nii.gz" \
             --data_type uint8 -f
         scil_labels_from_mask \
@@ -469,7 +465,7 @@ for nsub_path in "${subject_list[@]}"; do
 
         scil_volume_math union \
             "${mni_rois_dir}/${nsub}_${contra_nside}_VPM_mni.nii.gz" \
-            "${subject_first_order_dir}/${nsub}_${nside}_remaining_cp_density_mni.nii.gz" \
+            "${mni_rois_dir}/${nsub}_${nside}_remaining_cp_density_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_mni.nii.gz" \
             --data_type uint8 -f
         scil_labels_from_mask \
@@ -561,7 +557,7 @@ for nsub_path in "${subject_list[@]}"; do
             "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv1000.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_dPSN.trk" \
             --drawn_roi "${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz" 'any' 'include' \
-            --drawn_roi "${subject_first_order_dir}/${nsub}_${nside}_remaining_cp_density_mni.nii.gz" 'either_end' 'include' \
+            --drawn_roi "${mni_rois_dir}/${nsub}_${nside}_remaining_cp_density_mni.nii.gz" 'either_end' 'include' \
             --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_1.bdo" 'any' 'exclude' \
             --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_2.bdo" 'any' 'exclude' \
             --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_3.bdo" 'any' 'exclude' \
@@ -660,23 +656,51 @@ for nsub_path in "${subject_list[@]}"; do
         fi
     done
 
+
+
     # -------------------------
     # 8) Reject outliers and save final second-order bundles
     # -------------------------
     echo "|------------- 8) Reject outliers and save final second-order bundles -------------|"
     for nside in left right; do
-        scil_bundle_reject_outliers \
-            "${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_DTTT_Ipsilat_CS.trk" \
-            "${mni_tracking_dir_second_order}/final/${nsub}_from_${nside}_DTTT_Ipsilat_CS.trk" \
-            --alpha 0.30 -f
+        in_trk="${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_DTTT_Ipsilat_CS.trk"
+        out_trk="${mni_tracking_dir_second_order}/final/${nsub}_from_${nside}_DTTT_Ipsilat_CS.trk"
+
+        if trk_is_empty "${in_trk}"; then
+            echo "WARN: ${in_trk} missing or empty, skipping outlier rejection."
+        else
+            scil_bundle_reject_outliers \
+                "${in_trk}" \
+                "${out_trk}" \
+                --alpha 0.30 -f
+
+            if trk_is_empty "${out_trk}"; then
+                echo "WARN: ${out_trk} is empty after outlier rejection, removing."
+                rm -f "${out_trk}"
+            fi
+        fi
 
         for nbundle in DTTT_Ipsilat_dPSN DTTT_Controlat_CS VTTT_Controlat_OSandIS VTTT_Controlat_vPSN; do
-            scil_bundle_reject_outliers \
-                "${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_${nbundle}.trk" \
-                "${mni_tracking_dir_second_order}/final/${nsub}_from_${nside}_${nbundle}.trk" \
-                --alpha 0.50 -f
+            in_trk="${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_${nbundle}.trk"
+            out_trk="${mni_tracking_dir_second_order}/final/${nsub}_from_${nside}_${nbundle}.trk"
+
+            if trk_is_empty "${in_trk}"; then
+                echo "WARN: ${in_trk} missing or empty, skipping outlier rejection."
+            else
+                scil_bundle_reject_outliers \
+                    "${in_trk}" \
+                    "${out_trk}" \
+                    --alpha 0.50 -f
+
+                if trk_is_empty "${out_trk}"; then
+                    echo "WARN: ${out_trk} is empty after outlier rejection, removing."
+                    rm -f "${out_trk}"
+                fi
+            fi
         done
     done
+
+
 
     # -------------------------
     # 9) [BACK-TO-ORIG] Register final MNI bundles to orig space
@@ -707,5 +731,4 @@ for nsub_path in "${subject_list[@]}"; do
     echo ""
 done
 
-
-#help ,this is second_order_path
+#this is second_order_path branch
