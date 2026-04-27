@@ -135,6 +135,31 @@ trk_is_empty() {
 }
 
 # -------------------------
+# Helper for step 7
+# -------------------------
+get_label_ids_for_cut() {
+    local labels_file="$1"
+
+    python - <<PY
+import nibabel as nib
+import numpy as np
+
+f = r"""${labels_file}"""
+vals = np.unique(nib.load(f).get_fdata())
+vals = [int(v) for v in vals if v != 0]
+
+if len(vals) < 2:
+    print("")
+elif len(vals) == 2:
+    print(f"{vals[0]} {vals[1]}")
+else:
+    # practical default rule:
+    # if more than 2 nonzero labels exist, use first and last nonzero labels
+    print(f"{vals[0]} {vals[-1]}")
+PY
+}
+
+# -------------------------
 # Ensemble grid
 # -------------------------
 if [[ -n "${p}" && -n "${e}" ]]; then
@@ -251,7 +276,6 @@ for nsub_path in "${subject_list[@]}"; do
 
     # ============================================================
     # 0) Prepare subject-specific first-order density maps
-    #     Store directly in mni_space/rois
     # ============================================================
     echo "|------------- 0) Prepare subject-specific first-order density maps -------------|"
     for nside in left right; do
@@ -354,6 +378,10 @@ for nsub_path in "${subject_list[@]}"; do
     for nside in left right; do
         for role in from_thalamus_npv500 from_spinal_track_npv100 from_spinal_track_npv1000; do
             files=()
+            cleaned_files=()
+            clean_dir="${orig_tracking_dir}/trials_cleaned/${nside}_${role}"
+            mkdir -p "${clean_dir}"
+
             for step_size in "${step_list[@]}"; do
                 for theta in "${theta_list[@]}"; do
                     combo_tag="step_${step_size}_theta_${theta}"
@@ -362,17 +390,30 @@ for nsub_path in "${subject_list[@]}"; do
                 done
             done
 
-            if (( ${#files[@]} )); then
-                scil_tractogram_math concatenate "${files[@]}" \
-                    "${orig_merged_root}/${nsub}_${nside}_${role}.trk" -f
-            else
+            if (( ${#files[@]} == 0 )); then
                 echo "WARN: no files found for ${nside} ${role}"
+                continue
             fi
+
+            echo "Cleaning and merging ${#files[@]} files for ${nside} ${role}"
+
+            for f in "${files[@]}"; do
+                cleaned_f="${clean_dir}/$(basename "${f}")"
+
+python <<PY
+from dipy.io.streamline import load_tractogram, save_tractogram
+sft = load_tractogram(r"""${f}""", 'same', bbox_valid_check=False)
+sft.remove_invalid_streamlines()
+save_tractogram(sft, r"""${cleaned_f}""", bbox_valid_check=False)
+PY
+
+                cleaned_files+=("${cleaned_f}")
+            done
+
+            scil_tractogram_math concatenate "${cleaned_files[@]}" \
+                "${orig_merged_root}/${nsub}_${nside}_${role}.trk" -f
         done
     done
-
-
-
 
     # -------------------------
     # 4) Register merged second-order tractograms to MNI space
@@ -574,89 +615,48 @@ for nsub_path in "${subject_list[@]}"; do
     # -------------------------
     echo "|------------- 7) Cut filtered second-order bundles with label masks -------------|"
     for nside in left right; do
+        for nbundle in \
+            VTTT_Controlat_OSandIS \
+            VTTT_Controlat_vPSN \
+            DTTT_Controlat_CS \
+            DTTT_Ipsilat_CS \
+            DTTT_Ipsilat_dPSN; do
 
-        in_trk="${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_VTTT_Controlat_OSandIS.trk"
-        out_trk="${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_VTTT_Controlat_OSandIS.trk"
-        if trk_is_empty "${in_trk}"; then
-            echo "WARN: ${in_trk} is missing or empty, skipping cut."
-        else
+            in_trk="${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_${nbundle}.trk"
+            out_trk="${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_${nbundle}.trk"
+            labels_file="${mni_rois_dir}/${nsub}_${nside}_second_order_${nbundle}_Cuts_labels_mni.nii.gz"
+
+            if trk_is_empty "${in_trk}"; then
+                echo "WARN: ${in_trk} is missing or empty, skipping cut."
+                continue
+            fi
+
+            if [[ ! -f "${labels_file}" ]]; then
+                echo "WARN: Missing labels file ${labels_file}, skipping."
+                continue
+            fi
+
+            label_ids=$(get_label_ids_for_cut "${labels_file}")
+
+            if [[ -z "${label_ids}" ]]; then
+                echo "WARN: Could not determine 2 valid label ids for ${labels_file}, skipping."
+                continue
+            fi
+
+            echo "Cutting ${nside} ${nbundle} with label ids: ${label_ids}"
+
             scil_tractogram_cut_streamlines \
                 "${in_trk}" \
-                --labels "${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_OSandIS_Cuts_labels_mni.nii.gz" \
+                --labels "${labels_file}" \
+                --label_ids ${label_ids} \
                 "${out_trk}" -f
 
             if trk_is_empty "${out_trk}"; then
                 echo "WARN: ${out_trk} is empty after cut, removing."
                 rm -f "${out_trk}"
             fi
-        fi
-
-        in_trk="${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_VTTT_Controlat_vPSN.trk"
-        out_trk="${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_VTTT_Controlat_vPSN.trk"
-        if trk_is_empty "${in_trk}"; then
-            echo "WARN: ${in_trk} is missing or empty, skipping cut."
-        else
-            scil_tractogram_cut_streamlines \
-                "${in_trk}" \
-                --labels "${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_labels_mni.nii.gz" \
-                "${out_trk}" -f
-
-            if trk_is_empty "${out_trk}"; then
-                echo "WARN: ${out_trk} is empty after cut, removing."
-                rm -f "${out_trk}"
-            fi
-        fi
-
-        in_trk="${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Controlat_CS.trk"
-        out_trk="${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_DTTT_Controlat_CS.trk"
-        if trk_is_empty "${in_trk}"; then
-            echo "WARN: ${in_trk} is missing or empty, skipping cut."
-        else
-            scil_tractogram_cut_streamlines \
-                "${in_trk}" \
-                --labels "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Controlat_CS_Cuts_labels_mni.nii.gz" \
-                "${out_trk}" -f
-
-            if trk_is_empty "${out_trk}"; then
-                echo "WARN: ${out_trk} is empty after cut, removing."
-                rm -f "${out_trk}"
-            fi
-        fi
-
-        in_trk="${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_CS.trk"
-        out_trk="${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_DTTT_Ipsilat_CS.trk"
-        if trk_is_empty "${in_trk}"; then
-            echo "WARN: ${in_trk} is missing or empty, skipping cut."
-        else
-            scil_tractogram_cut_streamlines \
-                "${in_trk}" \
-                --labels "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_CS_Cuts_labels_mni.nii.gz" \
-                "${out_trk}" -f
-
-            if trk_is_empty "${out_trk}"; then
-                echo "WARN: ${out_trk} is empty after cut, removing."
-                rm -f "${out_trk}"
-            fi
-        fi
-
-        in_trk="${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_dPSN.trk"
-        out_trk="${mni_tracking_dir_second_order}/cut/${nsub}_from_${nside}_DTTT_Ipsilat_dPSN.trk"
-        if trk_is_empty "${in_trk}"; then
-            echo "WARN: ${in_trk} is missing or empty, skipping cut."
-        else
-            scil_tractogram_cut_streamlines \
-                "${in_trk}" \
-                --labels "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_dPSN_Cuts_labels_mni.nii.gz" \
-                "${out_trk}" -f
-
-            if trk_is_empty "${out_trk}"; then
-                echo "WARN: ${out_trk} is empty after cut, removing."
-                rm -f "${out_trk}"
-            fi
-        fi
+        done
     done
-
-
 
     # -------------------------
     # 8) Reject outliers and save final second-order bundles
@@ -700,8 +700,6 @@ for nsub_path in "${subject_list[@]}"; do
         done
     done
 
-
-
     # -------------------------
     # 9) [BACK-TO-ORIG] Register final MNI bundles to orig space
     # -------------------------
@@ -731,4 +729,5 @@ for nsub_path in "${subject_list[@]}"; do
     echo ""
 done
 
-#this is second_order_path branch
+
+#second_order_path
