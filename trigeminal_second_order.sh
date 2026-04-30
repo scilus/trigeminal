@@ -31,18 +31,6 @@ Usage:
                    [-f fa_threshold] [-t threads] [-g true|false]
                    [-p step_size] [-e theta_deg]
                    [--npv_spinal_long N] [--npv_spinal_short N] [--npv_thalamus N]
-
-Tracking params:
-  -p step_size    If set with -e, runs SINGLE combo (no ensemble)
-  -e theta_deg    If set with -p, runs SINGLE combo (no ensemble)
-  If -p/-e not provided, ensemble is used:
-    step  = 0.1 0.5 1.0
-    theta = 20 30 40
-
-Second-order seed budgets (TOTAL per role; auto-split across combos):
-  --npv_spinal_long N   default: 1000
-  --npv_spinal_short N  default: 100
-  --npv_thalamus N      default: 500
 EOF
     exit 1
 }
@@ -134,9 +122,25 @@ trk_is_empty() {
     fi
 }
 
-# -------------------------
-# Helper for step 7
-# -------------------------
+mask_has_nonzero_voxels() {
+    local f="$1"
+
+    if [[ ! -f "${f}" ]]; then
+        return 1
+    fi
+
+    local nz
+    nz=$(python - <<PY
+import nibabel as nib
+import numpy as np
+img = nib.load(r"""${f}""")
+print(int((img.get_fdata() > 0).sum()))
+PY
+)
+
+    [[ "${nz}" -gt 0 ]]
+}
+
 get_label_ids_for_cut() {
     local labels_file="$1"
 
@@ -153,8 +157,6 @@ if len(vals) < 2:
 elif len(vals) == 2:
     print(f"{vals[0]} {vals[1]}")
 else:
-    # practical default rule:
-    # if more than 2 nonzero labels exist, use first and last nonzero labels
     print(f"{vals[0]} {vals[-1]}")
 PY
 }
@@ -172,7 +174,6 @@ fi
 
 n_combos=$(( ${#step_list[@]} * ${#theta_list[@]} ))
 
-# Split total budgets across combos (ceiling division)
 npv_spinal_long_per_combo=$(( (npv_spinal_long_total + n_combos - 1) / n_combos ))
 npv_spinal_short_per_combo=$(( (npv_spinal_short_total + n_combos - 1) / n_combos ))
 npv_thalamus_per_combo=$(( (npv_thalamus_total + n_combos - 1) / n_combos ))
@@ -191,7 +192,6 @@ echo "  thalamus:     ${npv_thalamus_per_combo}     (from total ${npv_thalamus_t
 
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS="${nb_threads}"
 
-# Detect if -s is one subject folder or a parent folder of many subjects
 if [[ -d "${subject_dir}/tractoflow" ]]; then
     subject_list=("${subject_dir}")
 else
@@ -205,9 +205,6 @@ if [[ ${#subject_list[@]} -eq 0 ]]; then
     exit 1
 fi
 
-# ============================================================
-# Process each subject
-# ============================================================
 for nsub_path in "${subject_list[@]}"; do
     nsub=$(basename "${nsub_path}")
 
@@ -229,9 +226,6 @@ for nsub_path in "${subject_list[@]}"; do
     echo "|------------- PROCESSING SECOND-ORDER ENSEMBLE FOR ${nsub} -------------|"
     echo ""
 
-    # -------------------------
-    # Safety checks
-    # -------------------------
     for nside in left right; do
         [[ -f "${first_order_final_dir}/${nsub}_${nside}_spinal.trk" ]] || {
             echo "ERROR: Missing first-order file ${first_order_final_dir}/${nsub}_${nside}_spinal.trk"
@@ -274,9 +268,9 @@ for nsub_path in "${subject_list[@]}"; do
         exit 1
     }
 
-    # ============================================================
+    # -------------------------
     # 0) Prepare subject-specific first-order density maps
-    # ============================================================
+    # -------------------------
     echo "|------------- 0) Prepare subject-specific first-order density maps -------------|"
     for nside in left right; do
         scil_tractogram_compute_density_map \
@@ -338,35 +332,47 @@ for nsub_path in "${subject_list[@]}"; do
             echo "|=== Second-order combo: ${combo_tag} ===|"
 
             for nside in left right; do
-                scil_tracking_local \
-                    "${nsub_path}/tractoflow/${nsub}__fodf.nii.gz" \
-                    "${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz" \
-                    "${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz" \
-                    "${orig_trials_root}/${combo_tag}/${nsub}_${nside}_from_spinal_track_npv1000_${combo_tag}.trk" \
-                    --npv "${npv_spinal_long_per_combo}" \
-                    --step "${step_size}" \
-                    --theta "${theta}" \
-                    ${gpu} -v -f
+                spinal_seed="${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz"
+                thalamus_seed="${orig_rois_dir}/${nsub}_${nside}_thalamus_orig.nii.gz"
+                wm_mask="${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz"
 
-                scil_tracking_local \
-                    "${nsub_path}/tractoflow/${nsub}__fodf.nii.gz" \
-                    "${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz" \
-                    "${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz" \
-                    "${orig_trials_root}/${combo_tag}/${nsub}_${nside}_from_spinal_track_npv100_${combo_tag}.trk" \
-                    --npv "${npv_spinal_short_per_combo}" \
-                    --step "${step_size}" \
-                    --theta "${theta}" \
-                    ${gpu} -v -f
+                if mask_has_nonzero_voxels "${spinal_seed}"; then
+                    scil_tracking_local \
+                        "${nsub_path}/tractoflow/${nsub}__fodf.nii.gz" \
+                        "${spinal_seed}" \
+                        "${wm_mask}" \
+                        "${orig_trials_root}/${combo_tag}/${nsub}_${nside}_from_spinal_track_npv1000_${combo_tag}.trk" \
+                        --npv "${npv_spinal_long_per_combo}" \
+                        --step "${step_size}" \
+                        --theta "${theta}" \
+                        ${gpu} -v -f
 
-                scil_tracking_local \
-                    "${nsub_path}/tractoflow/${nsub}__fodf.nii.gz" \
-                    "${orig_rois_dir}/${nsub}_${nside}_thalamus_orig.nii.gz" \
-                    "${orig_rois_dir}/${nsub}_wm_mask_${fa_threshold}_orig.nii.gz" \
-                    "${orig_trials_root}/${combo_tag}/${nsub}_${nside}_from_thalamus_npv500_${combo_tag}.trk" \
-                    --npv "${npv_thalamus_per_combo}" \
-                    --step "${step_size}" \
-                    --theta "${theta}" \
-                    ${gpu} -v -f
+                    scil_tracking_local \
+                        "${nsub_path}/tractoflow/${nsub}__fodf.nii.gz" \
+                        "${spinal_seed}" \
+                        "${wm_mask}" \
+                        "${orig_trials_root}/${combo_tag}/${nsub}_${nside}_from_spinal_track_npv100_${combo_tag}.trk" \
+                        --npv "${npv_spinal_short_per_combo}" \
+                        --step "${step_size}" \
+                        --theta "${theta}" \
+                        ${gpu} -v -f
+                else
+                    echo "WARN: spinal seed is missing or empty for ${nside} at ${combo_tag}. Skipping spinal tracking."
+                fi
+
+                if mask_has_nonzero_voxels "${thalamus_seed}"; then
+                    scil_tracking_local \
+                        "${nsub_path}/tractoflow/${nsub}__fodf.nii.gz" \
+                        "${thalamus_seed}" \
+                        "${wm_mask}" \
+                        "${orig_trials_root}/${combo_tag}/${nsub}_${nside}_from_thalamus_npv500_${combo_tag}.trk" \
+                        --npv "${npv_thalamus_per_combo}" \
+                        --step "${step_size}" \
+                        --theta "${theta}" \
+                        ${gpu} -v -f
+                else
+                    echo "WARN: thalamus seed is missing or empty for ${nside} at ${combo_tag}. Skipping thalamus tracking."
+                fi
             done
         done
     done
@@ -729,5 +735,4 @@ PY
     echo ""
 done
 
-
-#second_order_path
+# second_order_path
