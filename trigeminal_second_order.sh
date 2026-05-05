@@ -161,6 +161,168 @@ else:
 PY
 }
 
+safe_compute_density_map() {
+    local in_trk="$1"
+    local out_mask="$2"
+
+    if trk_is_empty "${in_trk}"; then
+        echo "WARN: ${in_trk} is missing or empty. Skipping density map."
+        rm -f "${out_mask}"
+        return 0
+    fi
+
+    scil_tractogram_compute_density_map \
+        "${in_trk}" \
+        "${out_mask}" \
+        --binary -f
+
+    if ! mask_has_nonzero_voxels "${out_mask}"; then
+        echo "WARN: ${out_mask} has no non-zero voxels after density computation. Removing."
+        rm -f "${out_mask}"
+    fi
+}
+
+safe_apply_mask_transform_to_orig() {
+    local in_mask="$1"
+    local ref_img="$2"
+    local warp="$3"
+    local affine="$4"
+    local out_mask="$5"
+
+    if ! mask_has_nonzero_voxels "${in_mask}"; then
+        echo "WARN: ${in_mask} is missing or empty. Skipping mask transform."
+        rm -f "${out_mask}"
+        return 0
+    fi
+
+    antsApplyTransforms \
+        -d 3 \
+        -i "${in_mask}" \
+        -r "${ref_img}" \
+        -t "${warp}" \
+        -t "${affine}" \
+        -o "${out_mask}"
+
+    if ! mask_has_nonzero_voxels "${out_mask}"; then
+        echo "WARN: ${out_mask} has no non-zero voxels after transform. Removing."
+        rm -f "${out_mask}"
+    fi
+}
+
+safe_build_cut_labels() {
+    local mask_a="$1"
+    local mask_b="$2"
+    local out_mask="$3"
+    local out_labels="$4"
+
+    if ! mask_has_nonzero_voxels "${mask_a}"; then
+        echo "WARN: ${mask_a} is missing or empty. Skipping cut-mask construction."
+        rm -f "${out_mask}" "${out_labels}"
+        return 0
+    fi
+
+    if ! mask_has_nonzero_voxels "${mask_b}"; then
+        echo "WARN: ${mask_b} is missing or empty. Skipping cut-mask construction."
+        rm -f "${out_mask}" "${out_labels}"
+        return 0
+    fi
+
+    scil_volume_math union \
+        "${mask_a}" \
+        "${mask_b}" \
+        "${out_mask}" \
+        --data_type uint8 -f
+
+    if ! mask_has_nonzero_voxels "${out_mask}"; then
+        echo "WARN: ${out_mask} has no non-zero voxels after union. Removing."
+        rm -f "${out_mask}" "${out_labels}"
+        return 0
+    fi
+
+    scil_labels_from_mask \
+        "${out_mask}" \
+        "${out_labels}" \
+        -f
+}
+
+safe_filter_by_roi() {
+    local in_trk="$1"
+    local out_trk="$2"
+    shift 2
+
+    if trk_is_empty "${in_trk}"; then
+        echo "WARN: ${in_trk} is missing or empty. Skipping filter."
+        rm -f "${out_trk}"
+        return 0
+    fi
+
+    local args=("$@")
+    local i=0
+    local n=${#args[@]}
+
+    while (( i < n )); do
+        local key="${args[$i]}"
+
+        if [[ "${key}" == "--drawn_roi" ]]; then
+            if (( i + 3 >= n )); then
+                echo "WARN: malformed --drawn_roi arguments for ${out_trk}. Skipping filter."
+                rm -f "${out_trk}"
+                return 0
+            fi
+
+            local roi_file="${args[$((i + 1))]}"
+            local roi_action="${args[$((i + 3))]}"
+
+            if [[ ! -f "${roi_file}" ]]; then
+                echo "WARN: ROI ${roi_file} is missing. Skipping filter for ${out_trk}."
+                rm -f "${out_trk}"
+                return 0
+            fi
+
+            if [[ "${roi_action}" == "include" ]] && ! mask_has_nonzero_voxels "${roi_file}"; then
+                echo "WARN: include ROI ${roi_file} is empty. Skipping filter for ${out_trk}."
+                rm -f "${out_trk}"
+                return 0
+            fi
+
+            i=$((i + 4))
+            continue
+        fi
+
+        if [[ "${key}" == "--bdo" ]]; then
+            if (( i + 3 >= n )); then
+                echo "WARN: malformed --bdo arguments for ${out_trk}. Skipping filter."
+                rm -f "${out_trk}"
+                return 0
+            fi
+
+            local bdo_file="${args[$((i + 1))]}"
+
+            if [[ ! -f "${bdo_file}" ]]; then
+                echo "WARN: BDO ${bdo_file} is missing. Skipping filter for ${out_trk}."
+                rm -f "${out_trk}"
+                return 0
+            fi
+
+            i=$((i + 4))
+            continue
+        fi
+
+        i=$((i + 1))
+    done
+
+    scil_tractogram_filter_by_roi \
+        "${in_trk}" \
+        "${out_trk}" \
+        "${args[@]}" \
+        -f
+
+    if trk_is_empty "${out_trk}"; then
+        echo "WARN: ${out_trk} is empty after filtering. Removing."
+        rm -f "${out_trk}"
+    fi
+}
+
 # -------------------------
 # Ensemble grid
 # -------------------------
@@ -227,14 +389,15 @@ for nsub_path in "${subject_list[@]}"; do
     echo ""
 
     for nside in left right; do
-        [[ -f "${first_order_final_dir}/${nsub}_${nside}_spinal.trk" ]] || {
-            echo "ERROR: Missing first-order file ${first_order_final_dir}/${nsub}_${nside}_spinal.trk"
-            exit 1
-        }
-        [[ -f "${first_order_final_dir}/${nsub}_${nside}_remaining_cp.trk" ]] || {
-            echo "ERROR: Missing first-order file ${first_order_final_dir}/${nsub}_${nside}_remaining_cp.trk"
-            exit 1
-        }
+        if trk_is_empty "${first_order_final_dir}/${nsub}_${nside}_spinal.trk"; then
+            echo "WARN: Missing or empty first-order spinal file: ${first_order_final_dir}/${nsub}_${nside}_spinal.trk"
+            echo "WARN: ${nside} spinal-based second-order tracking will be skipped."
+        fi
+
+        if trk_is_empty "${first_order_final_dir}/${nsub}_${nside}_remaining_cp.trk"; then
+            echo "WARN: Missing or empty first-order remaining_cp file: ${first_order_final_dir}/${nsub}_${nside}_remaining_cp.trk"
+            echo "WARN: ${nside} remaining_cp-dependent second-order bundles may be skipped."
+        fi
     done
 
     [[ -f "${orig_rois_dir}/${nsub}_aparc.DKTatlas+aseg_orig.nii.gz" ]] || {
@@ -273,15 +436,13 @@ for nsub_path in "${subject_list[@]}"; do
     # -------------------------
     echo "|------------- 0) Prepare subject-specific first-order density maps -------------|"
     for nside in left right; do
-        scil_tractogram_compute_density_map \
+        safe_compute_density_map \
             "${first_order_final_dir}/${nsub}_${nside}_spinal.trk" \
-            "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" \
-            --binary -f
+            "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz"
 
-        scil_tractogram_compute_density_map \
+        safe_compute_density_map \
             "${first_order_final_dir}/${nsub}_${nside}_remaining_cp.trk" \
-            "${mni_rois_dir}/${nsub}_${nside}_remaining_cp_density_mni.nii.gz" \
-            --binary -f
+            "${mni_rois_dir}/${nsub}_${nside}_remaining_cp_density_mni.nii.gz"
     done
 
     # -------------------------
@@ -291,13 +452,12 @@ for nsub_path in "${subject_list[@]}"; do
 
     echo "|------------- 1.1) Transform subject spinal seed masks to orig space -------------|"
     for nside in left right; do
-        antsApplyTransforms \
-            -d 3 \
-            -i "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" \
-            -r "${nsub_path}/tractoflow/${nsub}__t1_warped.nii.gz" \
-            -t "${out_dir}/${nsub}/orig_space/transfo/2orig_1Warp.nii.gz" \
-            -t "${out_dir}/${nsub}/orig_space/transfo/2orig_0GenericAffine.mat" \
-            -o "${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz"
+        safe_apply_mask_transform_to_orig \
+            "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" \
+            "${nsub_path}/tractoflow/${nsub}__t1_warped.nii.gz" \
+            "${out_dir}/${nsub}/orig_space/transfo/2orig_1Warp.nii.gz" \
+            "${out_dir}/${nsub}/orig_space/transfo/2orig_0GenericAffine.mat" \
+            "${orig_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_orig.nii.gz"
     done
 
     echo "|------------- 1.2) Extract thalamus masks from the anatomical segmentation -------------|"
@@ -392,12 +552,15 @@ for nsub_path in "${subject_list[@]}"; do
                 for theta in "${theta_list[@]}"; do
                     combo_tag="step_${step_size}_theta_${theta}"
                     f="${orig_trials_root}/${combo_tag}/${nsub}_${nside}_${role}_${combo_tag}.trk"
-                    [[ -f "${f}" ]] && files+=("${f}")
+                    if ! trk_is_empty "${f}"; then
+                        files+=("${f}")
+                    fi
                 done
             done
 
             if (( ${#files[@]} == 0 )); then
-                echo "WARN: no files found for ${nside} ${role}"
+                echo "WARN: no non-empty files found for ${nside} ${role}"
+                rm -f "${orig_merged_root}/${nsub}_${nside}_${role}.trk"
                 continue
             fi
 
@@ -430,7 +593,10 @@ PY
             in_trk="${orig_merged_root}/${nsub}_${nside}_${role}.trk"
             out_trk="${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_${role}.trk"
 
-            if [[ -f "${in_trk}" ]]; then
+            if trk_is_empty "${in_trk}"; then
+                echo "WARN: merged orig tractogram missing or empty for ${nside} ${role}"
+                rm -f "${out_trk}"
+            else
                 scil_tractogram_apply_transform \
                     "${in_trk}" \
                     "${mni_dir}/MNI/mni_masked.nii.gz" \
@@ -439,8 +605,11 @@ PY
                     --in_deformation "${out_dir}/${nsub}/orig_space/transfo/2orig_1Warp.nii.gz" \
                     --remove_invalid \
                     --reverse_operation -f
-            else
-                echo "WARN: merged orig tractogram not found for ${nside} ${role}"
+
+                if trk_is_empty "${out_trk}"; then
+                    echo "WARN: ${out_trk} is empty after transform to MNI. Removing."
+                    rm -f "${out_trk}"
+                fi
             fi
         done
     done
@@ -470,55 +639,35 @@ PY
             contra_nside="left"
         fi
 
-        scil_volume_math union \
+        safe_build_cut_labels \
             "${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_remaining_cp_density_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_dPSN_Cuts_mni.nii.gz" \
-            --data_type uint8 -f
-        scil_labels_from_mask \
-            "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_dPSN_Cuts_mni.nii.gz" \
-            "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_dPSN_Cuts_labels_mni.nii.gz" \
-            -f
+            "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_dPSN_Cuts_labels_mni.nii.gz"
 
-        scil_volume_math union \
+        safe_build_cut_labels \
             "${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_CS_Cuts_mni.nii.gz" \
-            --data_type uint8 -f
-        scil_labels_from_mask \
-            "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_CS_Cuts_mni.nii.gz" \
-            "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_CS_Cuts_labels_mni.nii.gz" \
-            -f
+            "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Ipsilat_CS_Cuts_labels_mni.nii.gz"
 
-        scil_volume_math union \
+        safe_build_cut_labels \
             "${mni_rois_dir}/${nsub}_${contra_nside}_thalamus_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Controlat_CS_Cuts_mni.nii.gz" \
-            --data_type uint8 -f
-        scil_labels_from_mask \
-            "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Controlat_CS_Cuts_mni.nii.gz" \
-            "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Controlat_CS_Cuts_labels_mni.nii.gz" \
-            -f
+            "${mni_rois_dir}/${nsub}_${nside}_second_order_DTTT_Controlat_CS_Cuts_labels_mni.nii.gz"
 
-        scil_volume_math union \
+        safe_build_cut_labels \
             "${mni_rois_dir}/${nsub}_${contra_nside}_thalamus_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_OSandIS_Cuts_mni.nii.gz" \
-            --data_type uint8 -f
-        scil_labels_from_mask \
-            "${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_OSandIS_Cuts_mni.nii.gz" \
-            "${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_OSandIS_Cuts_labels_mni.nii.gz" \
-            -f
+            "${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_OSandIS_Cuts_labels_mni.nii.gz"
 
-        scil_volume_math union \
+        safe_build_cut_labels \
             "${mni_rois_dir}/${nsub}_${contra_nside}_VPM_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_remaining_cp_density_mni.nii.gz" \
             "${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_mni.nii.gz" \
-            --data_type uint8 -f
-        scil_labels_from_mask \
-            "${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_mni.nii.gz" \
-            "${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_labels_mni.nii.gz" \
-            -f
+            "${mni_rois_dir}/${nsub}_${nside}_second_order_VTTT_Controlat_vPSN_Cuts_labels_mni.nii.gz"
     done
 
     # -------------------------
@@ -534,7 +683,7 @@ PY
 
         echo "|------------- 6.1) From ${nside} - VTTT (contralateral) - OS/IS and vPSN -------------|"
 
-        scil_tractogram_filter_by_roi \
+        safe_filter_by_roi \
             "${mni_tracking_dir_second_order}/orig/${nsub}_${contra_nside}_from_thalamus_npv500.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_VTTT_Controlat_OSandIS.trk" \
             --drawn_roi "${mni_rois_dir}/${nsub}_left_cerebellum_wm_mni.nii.gz" 'any' 'exclude' \
@@ -549,10 +698,9 @@ PY
             --drawn_roi "${mni_dir}/MNI/cs_plaque.nii.gz" 'any' 'exclude' \
             --drawn_roi "${mni_dir}/MNI/from_${nside}/VTTT_Controlat_INC_VTT_Area.nii.gz" 'any' 'include' \
             --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/VTTT_Controlat_OSandIS_1.bdo" 'any' 'exclude' \
-            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/VTTT_Controlat_OSandIS_2.bdo" 'any' 'exclude' \
-            -f
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/VTTT_Controlat_OSandIS_2.bdo" 'any' 'exclude'
 
-        scil_tractogram_filter_by_roi \
+        safe_filter_by_roi \
             "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv1000.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_VTTT_Controlat_vPSN.trk" \
             --drawn_roi "${mni_rois_dir}/${nsub}_left_cerebellum_wm_mni.nii.gz" 'any' 'exclude' \
@@ -567,11 +715,10 @@ PY
             --bdo "${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_3.bdo" 'any' 'exclude' \
             --bdo "${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_4.bdo" 'any' 'exclude' \
             --bdo "${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_5.bdo" 'any' 'exclude' \
-            --bdo "${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_6.bdo" 'any' 'exclude' \
-            -f
+            --bdo "${mni_dir}/MNI/from_${nside}/VTTT_Controlat/VTTT_Controlat_vPSN_6.bdo" 'any' 'exclude'
 
         echo "|------------- 6.2) ${nside} - DTTT (contralateral) - CS -------------|"
-        scil_tractogram_filter_by_roi \
+        safe_filter_by_roi \
             "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_thalamus_npv500.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${contra_nside}_DTTT_Controlat_CS.trk" \
             --drawn_roi "${mni_rois_dir}/${nsub}_${contra_nside}_spinal_density_second_order_seed_mni.nii.gz" 'any' 'include' \
@@ -583,12 +730,11 @@ PY
             --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_1.bdo" 'any' 'exclude' \
             --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_2.bdo" 'any' 'exclude' \
             --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_3.bdo" 'any' 'exclude' \
-            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_4.bdo" 'any' 'exclude' \
-            -f
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Controlat_4.bdo" 'any' 'exclude'
 
         echo "|------------- 6.3) ${nside} - DTTT (ipsilateral) - dPSN and CS -------------|"
 
-        scil_tractogram_filter_by_roi \
+        safe_filter_by_roi \
             "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv100.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_CS.trk" \
             --drawn_roi "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" 'either_end' 'include' \
@@ -597,10 +743,9 @@ PY
             --drawn_roi "${mni_dir}/MNI/midsagittal_plane.nii.gz" 'any' 'exclude' \
             --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_1.bdo" 'any' 'exclude' \
             --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_2.bdo" 'any' 'exclude' \
-            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_3.bdo" 'any' 'exclude' \
-            -f
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_3.bdo" 'any' 'exclude'
 
-        scil_tractogram_filter_by_roi \
+        safe_filter_by_roi \
             "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv1000.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_dPSN.trk" \
             --drawn_roi "${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz" 'any' 'include' \
@@ -612,8 +757,7 @@ PY
             --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_5.bdo" 'any' 'exclude' \
             --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_6.bdo" 'any' 'exclude' \
             --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_7.bdo" 'any' 'exclude' \
-            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_8.bdo" 'any' 'exclude' \
-            -f
+            --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_dPSN_8.bdo" 'any' 'exclude'
     done
 
     # -------------------------
