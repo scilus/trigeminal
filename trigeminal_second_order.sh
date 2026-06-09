@@ -22,7 +22,8 @@ set -euo pipefail
 #   6) filter merged second-order tractograms into pathway bundles
 #   7) cut filtered bundles with label masks
 #   8) reject outliers and save final second-order bundles
-#   9) bring final MNI bundles back to ORIG
+#   8.5) filter final second-order bundles by length
+#   9) bring final length-filtered MNI bundles back to ORIG
 
 usage() {
     cat <<EOF 1>&2
@@ -319,6 +320,36 @@ safe_filter_by_roi() {
 
     if trk_is_empty "${out_trk}"; then
         echo "WARN: ${out_trk} is empty after filtering. Removing."
+        rm -f "${out_trk}"
+    fi
+}
+
+
+safe_filter_by_length() {
+    local in_trk="$1"
+    local out_trk="$2"
+    local minL="$3"
+    local maxL="$4"
+
+    if trk_is_empty "${in_trk}"; then
+        echo "WARN: ${in_trk} is missing or empty. Skipping length filtering."
+        rm -f "${out_trk}"
+        return 0
+    fi
+
+    echo "Length filtering ${in_trk}"
+    echo "  minL=${minL} maxL=${maxL}"
+    echo "  output=${out_trk}"
+
+    scil_tractogram_filter_by_length \
+        "${in_trk}" \
+        "${out_trk}" \
+        --minL "${minL}" \
+        --maxL "${maxL}" \
+        --display_counts -f
+
+    if trk_is_empty "${out_trk}"; then
+        echo "WARN: ${out_trk} is empty after length filtering. Removing."
         rm -f "${out_trk}"
     fi
 }
@@ -895,14 +926,75 @@ for nsub_path in "${subject_list[@]}"; do
         done
     done
 
+
     # -------------------------
-    # 9) [BACK-TO-ORIG] Register final MNI bundles to orig space
+    # 8.5) Filter final second-order bundles by length
     # -------------------------
-    echo "|------------- 9) [BACK-TO-ORIG] Register final MNI bundles to orig space -------------|"
+    echo "|------------- 8.5) Filter final second-order bundles by length -------------|"
+
+    mkdir -p "${mni_tracking_dir_second_order}/final_length"
+
+    # Length thresholds are in mm.
+    # You can modify each bundle independently if needed.
+    declare -A minL_by_bundle
+    declare -A maxL_by_bundle
+
+    minL_by_bundle["left_DTTT_Ipsilat_CS"]=10
+    maxL_by_bundle["left_DTTT_Ipsilat_CS"]=120
+
+    minL_by_bundle["right_DTTT_Ipsilat_CS"]=10
+    maxL_by_bundle["right_DTTT_Ipsilat_CS"]=120
+
+    minL_by_bundle["left_DTTT_Ipsilat_dPSN"]=10
+    maxL_by_bundle["left_DTTT_Ipsilat_dPSN"]=140
+
+    minL_by_bundle["right_DTTT_Ipsilat_dPSN"]=10
+    maxL_by_bundle["right_DTTT_Ipsilat_dPSN"]=140
+
+    minL_by_bundle["left_DTTT_Controlat_CS"]=10
+    maxL_by_bundle["left_DTTT_Controlat_CS"]=160
+
+    minL_by_bundle["right_DTTT_Controlat_CS"]=10
+    maxL_by_bundle["right_DTTT_Controlat_CS"]=160
+
+    minL_by_bundle["left_VTTT_Controlat_OSandIS"]=10
+    maxL_by_bundle["left_VTTT_Controlat_OSandIS"]=180
+
+    minL_by_bundle["right_VTTT_Controlat_OSandIS"]=10
+    maxL_by_bundle["right_VTTT_Controlat_OSandIS"]=180
+
+    minL_by_bundle["left_VTTT_Controlat_vPSN"]=10
+    maxL_by_bundle["left_VTTT_Controlat_vPSN"]=180
+
+    minL_by_bundle["right_VTTT_Controlat_vPSN"]=10
+    maxL_by_bundle["right_VTTT_Controlat_vPSN"]=180
 
     for nside in left right; do
         for nbundle in DTTT_Ipsilat_CS DTTT_Ipsilat_dPSN DTTT_Controlat_CS VTTT_Controlat_OSandIS VTTT_Controlat_vPSN; do
+            key="${nside}_${nbundle}"
+
             in_trk="${mni_tracking_dir_second_order}/final/${nsub}_from_${nside}_${nbundle}.trk"
+            out_trk="${mni_tracking_dir_second_order}/final_length/${nsub}_from_${nside}_${nbundle}.trk"
+
+            minL="${minL_by_bundle[${key}]}"
+            maxL="${maxL_by_bundle[${key}]}"
+
+            safe_filter_by_length \
+                "${in_trk}" \
+                "${out_trk}" \
+                "${minL}" \
+                "${maxL}"
+        done
+    done
+
+    # -------------------------
+    # 9) [BACK-TO-ORIG] Register final length-filtered MNI bundles to orig space
+    # -------------------------
+    echo "|------------- 9) [BACK-TO-ORIG] Register final length-filtered MNI bundles to orig space -------------|"
+
+    for nside in left right; do
+        for nbundle in DTTT_Ipsilat_CS DTTT_Ipsilat_dPSN DTTT_Controlat_CS VTTT_Controlat_OSandIS VTTT_Controlat_vPSN; do
+            in_trk="${mni_tracking_dir_second_order}/final_length/${nsub}_from_${nside}_${nbundle}.trk"
             out_trk="${orig_tracking_dir}/final/${nsub}_from_${nside}_${nbundle}_orig.trk"
 
             if [[ -f "${in_trk}" ]]; then
@@ -915,7 +1007,7 @@ for nsub_path in "${subject_list[@]}"; do
                     --in_deformation "${out_dir}/${nsub}/orig_space/transfo/2orig_1InverseWarp.nii.gz" \
                     --remove_invalid -f
             else
-                echo "WARN: Final MNI bundle not found for ${nside} ${nbundle}, skipping back-to-orig."
+                echo "WARN: Length-filtered final MNI bundle not found for ${nside} ${nbundle}, skipping back-to-orig."
             fi
         done
     done
@@ -924,4 +1016,4 @@ for nsub_path in "${subject_list[@]}"; do
     echo ""
 done
 
-# #git checkout -b second_order_incremental_concatenate
+# #git checkout -b second_order_filter_length
