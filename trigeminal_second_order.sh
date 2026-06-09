@@ -540,7 +540,8 @@ for nsub_path in "${subject_list[@]}"; do
     # -------------------------
     # 3) Merge second-order combo tractograms in orig space
     # -------------------------
-    echo "|------------- 3) Merge second-order combo tractograms in orig space -------------|"
+    echo "|------------- 3) Clean and incrementally merge second-order combo tractograms in orig space -------------|"
+
     for nside in left right; do
         for role in from_thalamus_npv500 from_spinal_track_npv100 from_spinal_track_npv1000; do
             files=()
@@ -552,6 +553,7 @@ for nsub_path in "${subject_list[@]}"; do
                 for theta in "${theta_list[@]}"; do
                     combo_tag="step_${step_size}_theta_${theta}"
                     f="${orig_trials_root}/${combo_tag}/${nsub}_${nside}_${role}_${combo_tag}.trk"
+
                     if ! trk_is_empty "${f}"; then
                         files+=("${f}")
                     fi
@@ -564,26 +566,69 @@ for nsub_path in "${subject_list[@]}"; do
                 continue
             fi
 
-            echo "Cleaning and merging ${#files[@]} files for ${nside} ${role}"
+            echo ""
+            echo "Cleaning ${#files[@]} files for ${nside} ${role}"
 
             for f in "${files[@]}"; do
-                cleaned_f="${clean_dir}/$(basename "${f}")"
+                base=$(basename "${f}" .trk)
+                cleaned_f="${clean_dir}/${base}_clean.trk"
 
-python <<PY
-from dipy.io.streamline import load_tractogram, save_tractogram
-sft = load_tractogram(r"""${f}""", 'same', bbox_valid_check=False)
-sft.remove_invalid_streamlines()
-save_tractogram(sft, r"""${cleaned_f}""", bbox_valid_check=False)
-PY
+                scil_tractogram_remove_invalid \
+                    "${f}" \
+                    "${cleaned_f}" \
+                    --remove_single_point \
+                    --remove_overlapping_points \
+                    -f
 
-                cleaned_files+=("${cleaned_f}")
+                if ! trk_is_empty "${cleaned_f}"; then
+                    cleaned_files+=("${cleaned_f}")
+                else
+                    echo "WARN: cleaned file is empty: ${cleaned_f}"
+                    rm -f "${cleaned_f}"
+                fi
             done
 
-            scil_tractogram_math concatenate "${cleaned_files[@]}" \
-                "${orig_merged_root}/${nsub}_${nside}_${role}.trk" -f
+            if (( ${#cleaned_files[@]} == 0 )); then
+                echo "WARN: no non-empty cleaned files found for ${nside} ${role}"
+                rm -f "${orig_merged_root}/${nsub}_${nside}_${role}.trk"
+                continue
+            fi
+
+            echo "Incrementally merging ${#cleaned_files[@]} cleaned files for ${nside} ${role}"
+
+            merged_out="${orig_merged_root}/${nsub}_${nside}_${role}.trk"
+
+            if (( ${#cleaned_files[@]} == 1 )); then
+                cp -f "${cleaned_files[0]}" "${merged_out}"
+            else
+                tmp_merge="${clean_dir}/tmp_${nsub}_${nside}_${role}_merge_0.trk"
+                cp -f "${cleaned_files[0]}" "${tmp_merge}"
+
+                idx=1
+                for cf in "${cleaned_files[@]:1}"; do
+                    next_tmp="${clean_dir}/tmp_${nsub}_${nside}_${role}_merge_${idx}.trk"
+
+                    echo "  Merge ${idx}/${#cleaned_files[@]} for ${nside} ${role}"
+
+                    scil_tractogram_math concatenate \
+                        "${tmp_merge}" \
+                        "${cf}" \
+                        "${next_tmp}" \
+                        -f
+
+                    rm -f "${tmp_merge}"
+                    tmp_merge="${next_tmp}"
+                    idx=$((idx + 1))
+                done
+
+                mv -f "${tmp_merge}" "${merged_out}"
+            fi
+
+            echo "Final merged file:"
+            echo "  ${merged_out}"
+            scil_tractogram_count_streamlines "${merged_out}" || true
         done
     done
-
     # -------------------------
     # 4) Register merged second-order tractograms to MNI space
     # -------------------------
@@ -879,4 +924,4 @@ PY
     echo ""
 done
 
-#git checkout -b second_order_incremental_concatenate
+# #git checkout -b second_order_incremental_concatenate
