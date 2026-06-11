@@ -1,6 +1,7 @@
 #!/bin/bash
 # TRIGEMINAL SYSTEM TRACTOGRAPHY - Samir Akeb (2022-2023)
 # TRIGEMINAL SYSTEM TRACTOGRAPHY - Arnaud Bore (2023-2024)
+# TRIGEMINAL SYSTEM TRACTOGRAPHY - Nasrin Rafiei (2025-2026)
 
 
 
@@ -54,7 +55,7 @@
 
 usage() { 
     echo "$(basename $0) [-s path/to/subject] [-m path/to/mni] [-o output_dir] [-t nb_threads] [-p step_size] [-e theta_deg] [-f fa_threshold] [-n npv_first_order] -g true" 1>&2
-    exit 1
+    exit 1/home/local/USHERBROOKE/rafn2101/data/data_test_retest/final_box_spinal/103818/orig_space/tracking_first_order/final_merged
 }
 
 
@@ -75,7 +76,7 @@ done
 shift $((OPTIND-1))
 
 if [ -z "${subject_dir}" ] || [ -z "${mni_dir}" ] || [ -z "${output_dir}" ]; then
-    usage
+    usage/home/local/USHERBROOKE/rafn2101/data/data_test_retest/final_box_spinal/103818/orig_space/tracking_first_order/final_merged
 fi
 
 
@@ -376,6 +377,7 @@ new_lower="${mni_dir}/MNI/new_lower.nii.gz"
 
 
 
+
 # =========================
 #  SEGMENT ONLY FINAL FILTERED FILE
 # =========================
@@ -413,8 +415,6 @@ for nside in left right; do
     deviated_br="${mni_dir}/MNI/right_spinal_deviation.nii.gz"
     fi
 
-
-
     scil_tractogram_filter_by_roi "${fin}" \
       "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_spinal.trk" \
       --drawn_roi  "${new_lower}" 'any' 'include' \
@@ -449,7 +449,7 @@ echo ""
 #  CLEANING FINAL BUNDLES
 # =========================
 
-
+rm -f "${merged_mni_dir}/final/${nsub}_"*.trk
 
 
 echo "|------------- 8) Cleaning ---------|"
@@ -458,7 +458,7 @@ echo "|------------- 8) Cleaning ---------|"
 for nside in left right; do
     # ----- 8.1 Mesencephalic -----
 
-    # Length-filter  the left and right mesencephalic bundle: 35< length < 70 mm now 35-70
+    # Length-filter  the left and right mesencephalic bundle: 35< length < 70 mm now 35-70  better is 0-56
     
     scil_tractogram_filter_by_length \
         "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_mesencephalic.trk" \
