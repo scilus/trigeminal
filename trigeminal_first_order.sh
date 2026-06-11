@@ -454,7 +454,7 @@ echo "|------------- 8) Cleaning ---------|"
 for nside in left right; do
     # ----- 8.1 Mesencephalic -----
 
-    # Length-filter  the left and right mesencephalic bundle: 35< length < 70 mm now 35-70  better is 0-56
+    # Length-filter  the left and right mesencephalic bundle: 35< length < 70 mm now 35-70
     
     scil_tractogram_filter_by_length \
         "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_mesencephalic.trk" \
