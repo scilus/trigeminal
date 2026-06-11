@@ -51,7 +51,7 @@
 
 usage() { 
     echo "$(basename $0) [-s path/to/subject] [-m path/to/mni] [-o output_dir] [-t nb_threads] [-p step_size] [-e theta_deg] [-f fa_threshold] [-n npv_first_order] -g true" 1>&2
-    exit 1/home/local/USHERBROOKE/rafn2101/data/data_test_retest/final_box_spinal/103818/orig_space/tracking_first_order/final_merged
+    exit 1
 }
 
 
@@ -72,7 +72,7 @@ done
 shift $((OPTIND-1))
 
 if [ -z "${subject_dir}" ] || [ -z "${mni_dir}" ] || [ -z "${output_dir}" ]; then
-    usage/home/local/USHERBROOKE/rafn2101/data/data_test_retest/final_box_spinal/103818/orig_space/tracking_first_order/final_merged
+    usage
 fi
 
 
