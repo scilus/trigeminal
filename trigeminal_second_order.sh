@@ -811,7 +811,7 @@ for nsub_path in "${subject_list[@]}"; do
         echo "|------------- 6.3) ${nside} - DTTT (ipsilateral) - dPSN and CS -------------|"
 
         safe_filter_by_roi \
-            "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv150.trk" \
+            "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv300.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_CS.trk" \
             --drawn_roi "${mni_rois_dir}/${nsub}_${nside}_spinal_density_second_order_seed_mni.nii.gz" 'either_end' 'include' \
             --drawn_roi "${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz" 'any' 'include' \
