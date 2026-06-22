@@ -66,9 +66,9 @@ shift $((OPTIND-1))
 # -------------------------
 # Parse optional long args
 # -------------------------
-npv_spinal_long_total=3000
-npv_spinal_short_total=300
-npv_thalamus_total=1500
+npv_spinal_long_total=1000
+npv_spinal_short_total=100
+npv_thalamus_total=500
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
