@@ -532,7 +532,7 @@ for nsub_path in "${subject_list[@]}"; do
                         "${nsub_path}/tractoflow/${nsub}__fodf.nii.gz" \
                         "${spinal_seed}" \
                         "${wm_mask}" \
-                        "${orig_trials_root}/${combo_tag}/${nsub}_${nside}_from_spinal_track_npv1500_${combo_tag}.trk" \
+                        "${orig_trials_root}/${combo_tag}/${nsub}_${nside}_from_spinal_track_npv3000_${combo_tag}.trk" \
                         --npv "${npv_spinal_long_per_combo}" \
                         --step "${step_size}" \
                         --theta "${theta}" \
@@ -556,7 +556,7 @@ for nsub_path in "${subject_list[@]}"; do
                         "${nsub_path}/tractoflow/${nsub}__fodf.nii.gz" \
                         "${thalamus_seed}" \
                         "${wm_mask}" \
-                        "${orig_trials_root}/${combo_tag}/${nsub}_${nside}_from_thalamus_npv600_${combo_tag}.trk" \
+                        "${orig_trials_root}/${combo_tag}/${nsub}_${nside}_from_thalamus_npv1500_${combo_tag}.trk" \
                         --npv "${npv_thalamus_per_combo}" \
                         --step "${step_size}" \
                         --theta "${theta}" \
@@ -574,7 +574,7 @@ for nsub_path in "${subject_list[@]}"; do
     echo "|------------- 3) Clean and incrementally merge second-order combo tractograms in orig space -------------|"
 
     for nside in left right; do
-        for role in from_thalamus_npv600 from_spinal_track_npv150 from_spinal_track_npv1500; do
+        for role in from_thalamus_npv1500 from_spinal_track_npv300 from_spinal_track_npv3000; do
             files=()
             cleaned_files=()
             clean_dir="${orig_tracking_dir}/trials_cleaned/${nside}_${role}"
@@ -665,7 +665,7 @@ for nsub_path in "${subject_list[@]}"; do
     # -------------------------
     echo "|------------- 4) Register merged second-order tractograms to MNI space -------------|"
     for nside in left right; do
-        for role in from_thalamus_npv600 from_spinal_track_npv150 from_spinal_track_npv1500; do
+        for role in from_thalamus_npv1500 from_spinal_track_npv300 from_spinal_track_npv3000; do
             in_trk="${orig_merged_root}/${nsub}_${nside}_${role}.trk"
             out_trk="${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_${role}.trk"
 
@@ -760,7 +760,7 @@ for nsub_path in "${subject_list[@]}"; do
         echo "|------------- 6.1) From ${nside} - VTTT (contralateral) - OS/IS and vPSN -------------|"
 
         safe_filter_by_roi \
-            "${mni_tracking_dir_second_order}/orig/${nsub}_${contra_nside}_from_thalamus_npv600.trk" \
+            "${mni_tracking_dir_second_order}/orig/${nsub}_${contra_nside}_from_thalamus_npv1500.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_VTTT_Controlat_OSandIS.trk" \
             --drawn_roi "${mni_rois_dir}/${nsub}_left_cerebellum_wm_mni.nii.gz" 'any' 'exclude' \
             --drawn_roi "${mni_rois_dir}/${nsub}_right_cerebellum_wm_mni.nii.gz" 'any' 'exclude' \
@@ -777,7 +777,7 @@ for nsub_path in "${subject_list[@]}"; do
             --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/VTTT_Controlat_OSandIS_2.bdo" 'any' 'exclude'
 
         safe_filter_by_roi \
-            "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv1500.trk" \
+            "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv3000.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_VTTT_Controlat_vPSN.trk" \
             --drawn_roi "${mni_rois_dir}/${nsub}_left_cerebellum_wm_mni.nii.gz" 'any' 'exclude' \
             --drawn_roi "${mni_rois_dir}/${nsub}_right_cerebellum_wm_mni.nii.gz" 'any' 'exclude' \
@@ -795,7 +795,7 @@ for nsub_path in "${subject_list[@]}"; do
 
         echo "|------------- 6.2) ${nside} - DTTT (contralateral) - CS -------------|"
         safe_filter_by_roi \
-            "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_thalamus_npv600.trk" \
+            "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_thalamus_npv1500.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${contra_nside}_DTTT_Controlat_CS.trk" \
             --drawn_roi "${mni_rois_dir}/${nsub}_${contra_nside}_spinal_density_second_order_seed_mni.nii.gz" 'any' 'include' \
             --drawn_roi "${mni_rois_dir}/${nsub}_${nside}_thalamus_mni.nii.gz" 'any' 'include' \
@@ -822,7 +822,7 @@ for nsub_path in "${subject_list[@]}"; do
             --bdo "${mni_dir}/MNI/from_${nside}/new_ROIs/DTTT_Ipsilat_CS_3.bdo" 'any' 'exclude'
 
         safe_filter_by_roi \
-            "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv1500.trk" \
+            "${mni_tracking_dir_second_order}/orig/${nsub}_${nside}_from_spinal_track_npv3000.trk" \
             "${mni_tracking_dir_second_order}/filtered/${nsub}_from_${nside}_DTTT_Ipsilat_dPSN.trk" \
             --drawn_roi "${mni_rois_dir}/${nsub}_${nside}_VPM_mni.nii.gz" 'any' 'include' \
             --drawn_roi "${mni_rois_dir}/${nsub}_${nside}_remaining_cp_density_mni.nii.gz" 'either_end' 'include' \
@@ -951,13 +951,13 @@ for nsub_path in "${subject_list[@]}"; do
     maxL_by_bundle["DTTT_Ipsilat_CS"]=100
 
     minL_by_bundle["DTTT_Ipsilat_dPSN"]=0
-    maxL_by_bundle["DTTT_Ipsilat_dPSN"]=120
+    maxL_by_bundle["DTTT_Ipsilat_dPSN"]=90
 
     minL_by_bundle["DTTT_Controlat_CS"]=0
     maxL_by_bundle["DTTT_Controlat_CS"]=165
 
     minL_by_bundle["VTTT_Controlat_OSandIS"]=0
-    maxL_by_bundle["VTTT_Controlat_OSandIS"]=181
+    maxL_by_bundle["VTTT_Controlat_OSandIS"]=185
 
     minL_by_bundle["VTTT_Controlat_vPSN"]=0
     maxL_by_bundle["VTTT_Controlat_vPSN"]=107
