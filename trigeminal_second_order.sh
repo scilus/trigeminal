@@ -1,6 +1,7 @@
 #!/bin/bash
 # TRIGEMINAL SYSTEM TRACTOGRAPHY - Samir Akeb (2022-2023)
 # TRIGEMINAL SYSTEM TRACTOGRAPHY - Arnaud Bore (2023-2024)
+# TRIGEMINAL SYSTEM TRACTOGRAPHY - Nasrin Rafiei (2025-2026)
 
 # This script performs tractography of the second order trigeminal system based on the output of 
 # the first-order tractography pipeline (trigeminal_first_order.sh).

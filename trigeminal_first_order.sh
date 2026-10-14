@@ -1,4 +1,8 @@
 #!/bin/bash
+# TRIGEMINAL SYSTEM TRACTOGRAPHY - Samir Akeb (2022-2023)
+# TRIGEMINAL SYSTEM TRACTOGRAPHY - Arnaud Bore (2023-2024)
+# TRIGEMINAL SYSTEM TRACTOGRAPHY - Nasrin Rafiei (2025-2026)
+
 
 # This script performs ensemble tractography of the trigeminal system using fODFs and FA maps
 # from TractoFlow. Anatomical ROIs from both FreeSurfer and the ROIs_mean MNI folder are used to
@@ -369,6 +373,7 @@ new_lower="${mni_dir}/MNI/new_lower.nii.gz"
 
 
 
+
 # =========================
 #  SEGMENT ONLY FINAL FILTERED FILE
 # =========================
@@ -406,8 +411,6 @@ for nside in left right; do
     deviated_br="${mni_dir}/MNI/right_spinal_deviation.nii.gz"
     fi
 
-
-
     scil_tractogram_filter_by_roi "${fin}" \
       "${merged_mni_dir}/segmented/ROIs/${nsub}_${nside}_spinal.trk" \
       --drawn_roi  "${new_lower}" 'any' 'include' \
@@ -442,7 +445,7 @@ echo ""
 #  CLEANING FINAL BUNDLES
 # =========================
 
-
+rm -f "${merged_mni_dir}/final/${nsub}_"*.trk
 
 
 echo "|------------- 8) Cleaning ---------|"
